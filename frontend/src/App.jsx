@@ -3,7 +3,25 @@ import { api } from "./api";
 import { SECTIONS, computeTotals } from "./fields";
 import "./App.css";
 
-function Field({ field, value, onChange }) {
+function Field({ field, value, onChange, onDraft, drafting }) {
+  if (field.type === "textarea") {
+    return (
+      <label className="field field-wide">
+        <span>{field.label}{field.required ? " *" : ""}</span>
+        <textarea
+          rows={8}
+          value={value ?? ""}
+          lang={field.lang === "mm" ? "my" : undefined}
+          onChange={(e) => onChange(field.name, e.target.value)}
+        />
+        {field.draft && (
+          <button type="button" className="draft-btn" onClick={() => onDraft(field)} disabled={drafting}>
+            {drafting ? "Generating draft…" : "Generate draft from data"}
+          </button>
+        )}
+      </label>
+    );
+  }
   return (
     <label className="field">
       <span>{field.label}{field.required ? " *" : ""}</span>
@@ -56,6 +74,22 @@ export default function App() {
   const [flowchartKey, setFlowchartKey] = useState(0);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportError, setExportError] = useState(null);
+  const [drafting, setDrafting] = useState(false);
+
+  async function handleDraft(field) {
+    if (!projectId || field.draft !== "slide21") return;
+    setDrafting(true);
+    try {
+      await api.updateProject(projectId, { name, data }); // ensure latest data on server
+      const result = await api.slide21Draft(projectId);
+      setField(field.name, result.text);
+    } catch (e) {
+      // non-fatal: leave the field as-is
+      console.error(e);
+    } finally {
+      setDrafting(false);
+    }
+  }
 
   const totals = useMemo(() => computeTotals(data), [data]);
 
@@ -141,7 +175,7 @@ export default function App() {
             <h2>{section.title}</h2>
             <div className="field-grid">
               {section.fields.map((f) => (
-                <Field key={f.name} field={f} value={data[f.name]} onChange={setField} />
+                <Field key={f.name} field={f} value={data[f.name]} onChange={setField} onDraft={handleDraft} drafting={drafting} />
               ))}
             </div>
             {section.images && (

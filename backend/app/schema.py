@@ -47,11 +47,20 @@ VARIABLE_DEFAULTS = {
     "epc_precharge": True,
     "generator_dod_trigger_pct": 20,
     "priority_order": ["Solar", "Battery", "EPC", "Generator"],
+    # Slide 18 free-text narrative (Burmese); blank = keep template default
+    "power_management_text": "",
+    # Slide 21 narrative (Burmese); auto-drafted then editable. Blank = keep template default
+    "power_priority_text": "",
     # 4.7 warranty
     "install_warranty_years": 1,
 }
 
-AUTO_FIELDS = ("total_inverter_kw", "total_battery_kwh", "total_solar_kwp")
+AUTO_FIELDS = (
+    "total_inverter_kw",
+    "total_battery_kwh",
+    "total_solar_kwp",
+    "battery_autonomy_hours",
+)
 
 
 def compute_auto_fields(data: dict) -> dict:
@@ -66,6 +75,10 @@ def compute_auto_fields(data: dict) -> dict:
     total_battery_kwh = num("battery_qty") * num("battery_unit_kwh")
     total_solar_kwp = num("panel_qty") * num("panel_watt") / 1000
 
+    # Battery-only runtime if the grid is down: usable battery energy / average load.
+    avg_load = num("avg_load_kw")
+    battery_autonomy_hours = (total_battery_kwh / avg_load) if avg_load else 0
+
     def fmt(x):
         return int(x) if float(x).is_integer() else round(x, 2)
 
@@ -73,6 +86,7 @@ def compute_auto_fields(data: dict) -> dict:
         "total_inverter_kw": fmt(total_inverter_kw),
         "total_battery_kwh": fmt(total_battery_kwh),
         "total_solar_kwp": fmt(total_solar_kwp),
+        "battery_autonomy_hours": fmt(round(battery_autonomy_hours, 1)),
     }
 
 

@@ -83,6 +83,25 @@ export const SECTIONS = [
       { name: "epc_start_time", label: "EPC Start Time", type: "time" },
       { name: "epc_end_time", label: "EPC End Time", type: "time" },
       { name: "generator_dod_trigger_pct", label: "Generator DoD Trigger (%)", type: "number" },
+      {
+        name: "power_priority_text",
+        label: "Slide 21 — Power Source Priority narrative (Burmese; leave blank to keep template default)",
+        type: "textarea",
+        lang: "mm",
+        draft: "slide21",
+      },
+    ],
+  },
+  {
+    key: "power_mgmt",
+    title: "Power Management (Slide 18)",
+    fields: [
+      {
+        name: "power_management_text",
+        label: "Slide 18 — Power Management narrative (Burmese; leave blank to keep template default)",
+        type: "textarea",
+        lang: "mm",
+      },
     ],
   },
   {

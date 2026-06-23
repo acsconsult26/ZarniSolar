@@ -36,6 +36,16 @@ REPLACEMENTS = [
     (3, "TextBox 14", "~", ""),
     (3, "TextBox 14", " 8h ", ""),
 
+    # Slide 4 - survey photos title: "<site_name> သို့ Survey ဆင်းခဲ့သည့် မှတ်တမ်းပုံရိပ်များ"
+    (4, "TextBox 7", "MRTV ", "{{site_name}}"),
+    (4, "TextBox 7", "Sagaing", ""),
+
+    # Slide 8 - executive summary: client name + battery-only runtime line
+    (8, "Rectangle 18", "MRTV ", "{{site_name}} "),
+    (8, "Rectangle 18",
+     "24/7 စဉ်ဆက်မပြတ် လျှပ်စစ်ဓာတ်အား ထောက်ပံ့မှု",
+     "24/7 စဉ်ဆက်မပြတ် လျှပ်စစ်ဓာတ်အား ထောက်ပံ့မှု (Grid မရှိချိန် Battery ဖြင့် ~{{battery_autonomy_hours}} နာရီ ဆက်လက်လည်ပတ်နိုင်)"),
+
     # Slide 5 - data logger
     (5, "Rectangle 3", "(22-May-2026 , 10:35AM)", "({{data_logger_start}})"),
     (5, "Rectangle 3", "(24-May-2026 , 10:35AM)", "({{data_logger_end}})"),
