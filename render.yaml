@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: zarni-solar-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        value: sqlite:////app/app.db
+      - key: UPLOAD_DIR
+        value: /app/uploads
+      - key: IMAGE_GEN_PROVIDER
+        value: ""
+      - key: IMAGE_GEN_API_KEY
+        value: ""
