@@ -7,8 +7,9 @@ import io
 import re
 from pathlib import Path
 
+from PIL import Image, ImageDraw
 from pptx import Presentation
-from pptx.util import Emu
+from pptx.util import Emu, Pt
 
 from ..schema import merged_field_values
 from .flowchart import render_priority_flowchart
@@ -93,6 +94,70 @@ def _replace_picture(slide, shape_name: str, image_bytes: bytes):
     return True
 
 
+def _replace_picture_contain(slide, shape_name: str, image_bytes: bytes):
+    """Swap a placeholder picture but preserve the new image's aspect ratio,
+    fitting it inside the placeholder box (no stretching) and centering it."""
+    shape = find_shape(slide.shapes, shape_name)
+    if shape is None:
+        return False
+    box_left, box_top, box_w, box_h = shape.left, shape.top, shape.width, shape.height
+    shape._element.getparent().remove(shape._element)
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as im:
+            iw, ih = im.size
+    except Exception:
+        iw, ih = box_w, box_h
+    scale = min(box_w / iw, box_h / ih)
+    new_w = int(iw * scale)
+    new_h = int(ih * scale)
+    left = box_left + (box_w - new_w) // 2
+    top = box_top + (box_h - new_h) // 2
+    slide.shapes.add_picture(io.BytesIO(image_bytes), left, top, new_w, new_h)
+    return True
+
+
+def _placeholder_image(text: str = "No image added") -> bytes:
+    """A neutral light-grey placeholder PNG used when no photo was uploaded,
+    so leftover reference-deck images never appear in a client's proposal."""
+    img = Image.new("RGB", (800, 600), (235, 238, 242))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([2, 2, 797, 597], outline=(180, 188, 200), width=3)
+    # default bitmap font is tiny; scale up by drawing then noting it's fine for a placeholder
+    bbox = draw.textbbox((0, 0), text)
+    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    draw.text(((800 - tw) / 2, (600 - th) / 2), text, fill=(120, 130, 145))
+    out = io.BytesIO()
+    img.save(out, format="PNG")
+    return out.getvalue()
+
+
+def _set_shape_text(shape, text: str):
+    """Replace a shape's text with `text`, keeping the first run's font but
+    forcing a Myanmar font for Burmese. Paragraphs split on newlines."""
+    if shape is None or not shape.has_text_frame:
+        return
+    tf = shape.text_frame
+    tf.word_wrap = True
+    # capture a font size from the first existing run if any
+    size = None
+    for p in tf.paragraphs:
+        for r in p.runs:
+            if r.font.size:
+                size = r.font.size
+                break
+        if size:
+            break
+    tf.clear()
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        para = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        run = para.add_run()
+        run.text = line
+        if BURMESE_RE.search(line):
+            run.font.name = BURMESE_FONT
+        run.font.size = size or Pt(12)
+
+
 def _load_image_bytes(uploads: dict, field: str, storage):
     path = uploads.get(field)
     if not path or not storage.exists(path):
@@ -111,9 +176,26 @@ def export_project(project, storage, reference_images: list[bytes] | None = None
         slide = prs.slides[slide_idx - 1]
         for shape_name, field in slots.items():
             img = _load_image_bytes(uploads, field, storage)
-            if img:
-                _replace_picture(slide, shape_name, img)
-            # if missing, leave the original placeholder image in place (never crash)
+            # Always swap the slot: an uploaded photo, or a neutral "No image
+            # added" placeholder so the original reference-deck photos never
+            # leak into a client's proposal.
+            _replace_picture(slide, shape_name, img or _placeholder_image())
+
+    # Slide 18 - Power Management: per-client free text overrides the template
+    pm_text = (values.get("power_management_text") or "").strip()
+    if pm_text:
+        slide18 = prs.slides[17]
+        _set_shape_text(find_shape(slide18.shapes, "Rectangle 1"), pm_text)
+        for extra in ("Rectangle 2", "Rectangle 3"):
+            sh = find_shape(slide18.shapes, extra)
+            if sh is not None:
+                sh._element.getparent().remove(sh._element)
+
+    # Slide 21 - Power Source Priority: edited/auto-drafted text overrides template
+    pp_text = (values.get("power_priority_text") or "").strip()
+    if pp_text:
+        slide21 = prs.slides[20]
+        _set_shape_text(find_shape(slide21.shapes, "Rectangle 3"), pp_text)
 
     # Slide 19 - AI-generated infographic (cached image on the project, or manual fallback)
     if storage.exists(project.slide19_image_path):
@@ -131,7 +213,7 @@ def export_project(project, storage, reference_images: list[bytes] | None = None
     else:
         flowchart_bytes = storage.read_bytes(flowchart_path)
     slide20 = prs.slides[19]
-    _replace_picture(slide20, "Picture 3", flowchart_bytes)
+    _replace_picture_contain(slide20, "Picture 3", flowchart_bytes)
 
     # Slide 23 - admin reference gallery (replace as many photo slots as we have images for)
     if reference_images:

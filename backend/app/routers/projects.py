@@ -8,6 +8,7 @@ from ..schema import merged_field_values
 from ..services.pptx_export import export_project
 from ..services import imagegen
 from ..services.flowchart import render_priority_flowchart
+from ..services.text_drafts import compose_power_priority_draft
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -101,6 +102,15 @@ def upload_slide19_fallback(project_id: int, file: UploadFile = File(...), db: S
     project.slide19_image_path = path
     db.commit()
     return {"url": storage.url_for(path)}
+
+
+@router.get("/{project_id}/slide21/draft")
+def slide21_draft(project_id: int, db: Session = Depends(get_db)):
+    project = db.query(Project).get(project_id)
+    if not project:
+        raise HTTPException(404, "Project not found")
+    values = merged_field_values(project.data or {})
+    return {"text": compose_power_priority_draft(values)}
 
 
 @router.get("/{project_id}/slide20/preview")

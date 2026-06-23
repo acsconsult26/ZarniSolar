@@ -49,6 +49,8 @@ export const api = {
     return fetch(`${API_BASE}/projects/${id}/slide19/upload`, { method: "POST", body: fd }).then(json);
   },
 
+  slide21Draft: (id) => fetch(`${API_BASE}/projects/${id}/slide21/draft`).then(json),
+
   previewFlowchartUrl: (id) => `${API_BASE}/projects/${id}/slide20/preview?t=${Date.now()}`,
 
   exportProject: async (id) => {
