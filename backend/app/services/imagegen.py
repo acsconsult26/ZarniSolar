@@ -54,17 +54,34 @@ def generate_image(prompt: str) -> bytes:
     if provider == "openai":
         base_url = os.environ.get("IMAGE_GEN_API_BASE", "https://api.openai.com/v1")
         model = os.environ.get("IMAGE_GEN_MODEL", "gpt-image-1")
+        size = os.environ.get("IMAGE_GEN_SIZE", "1536x1024")
         try:
             resp = httpx.post(
                 f"{base_url}/images/generations",
                 headers={"Authorization": f"Bearer {api_key}"},
-                json={"model": model, "prompt": prompt, "size": "1536x1024"},
+                json={"model": model, "prompt": prompt, "size": size},
                 timeout=120,
             )
-            resp.raise_for_status()
+            if resp.status_code >= 400:
+                # Surface OpenAI's actual error message, not just the status code.
+                try:
+                    detail = resp.json().get("error", {}).get("message") or resp.text
+                except Exception:
+                    detail = resp.text
+                raise ImageGenError(f"{model}: {resp.status_code} {detail}")
             payload = resp.json()
-            b64 = payload["data"][0]["b64_json"]
-            return base64.b64decode(b64)
+            item = payload["data"][0]
+            b64 = item.get("b64_json")
+            if b64:
+                return base64.b64decode(b64)
+            # Some models/endpoints return a URL instead of base64.
+            if item.get("url"):
+                img = httpx.get(item["url"], timeout=120)
+                img.raise_for_status()
+                return img.content
+            raise ImageGenError(f"{model}: response contained no image data")
+        except ImageGenError:
+            raise
         except Exception as e:
             raise ImageGenError(str(e))
 
