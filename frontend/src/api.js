@@ -74,6 +74,49 @@ export const api = {
   },
 
   fileUrl: (path) => (path ? `${API_BASE}${path}` : null),
+
+  // ---- admin ----
+  login: (email, password) =>
+    fetch(`${API_BASE}/admin/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    }).then(json),
+
+  listProductsAll: () => fetch(`${API_BASE}/admin/products`).then(json),
+
+  createProduct: (token, body) =>
+    fetch(`${API_BASE}/admin/products`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    }).then(json),
+
+  updateProduct: (token, id, body) =>
+    fetch(`${API_BASE}/admin/products/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    }).then(json),
+
+  deleteProduct: (token, id) =>
+    fetch(`${API_BASE}/admin/products/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(json),
+
+  uploadProductImage: (token, id, file) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return fetch(`${API_BASE}/admin/products/${id}/image`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: fd,
+    }).then(json);
+  },
+
+  deleteProject: (id) =>
+    fetch(`${API_BASE}/projects/${id}`, { method: "DELETE" }).then(json),
 };
 
 export default API_BASE;

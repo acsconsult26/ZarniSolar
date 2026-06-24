@@ -29,6 +29,22 @@ class ReferenceImage(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 
+class Product(Base):
+    __tablename__ = "products"
+
+    id = Column(Integer, primary_key=True, index=True)
+    category = Column(String, nullable=False)  # "panel" | "inverter" | "battery"
+    brand = Column(String, nullable=False, default="")
+    model_name = Column(String, nullable=False, default="")
+    # numeric rating + its unit, e.g. 650 "W" / 60 "kW" / 12 "kWh"
+    unit_value = Column(Integer, nullable=True)
+    unit_label = Column(String, nullable=True)
+    specs = Column(JSON, nullable=False, default=list)  # list of "label: value" spec lines
+    warranty_line = Column(String, nullable=True)
+    image_path = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
 class Boilerplate(Base):
     """Generic key/value store for all FIXED admin-editable content,
     field defaults, and the slide-19 image prompt template."""

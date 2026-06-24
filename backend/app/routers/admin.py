@@ -6,8 +6,23 @@ from ..db import get_db
 from ..models import Boilerplate, ReferenceImage
 from ..storage import storage
 from ..services.imagegen import DEFAULT_PROMPT_TEMPLATE
+from ..auth import verify_credentials, issue_token, require_admin
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+@router.post("/login")
+def login(body: dict):
+    email = body.get("email", "")
+    password = body.get("password", "")
+    if not verify_credentials(email, password):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    return {"token": issue_token(email), "email": email}
+
+
+@router.get("/me", dependencies=[Depends(require_admin)])
+def me():
+    return {"authenticated": True}
 
 BOILERPLATE_DEFAULTS = {
     "company_info": {

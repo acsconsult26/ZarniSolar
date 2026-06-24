@@ -50,5 +50,41 @@ button { font-family: inherit; }
 .export-actions button, .slide19-actions button { padding: 0.6rem 1.2rem; border-radius: 6px; border: 1px solid var(--border); background: white; cursor: pointer; }
 .export-actions .primary { background: var(--blue); color: white; border-color: var(--blue); font-weight: 600; }
 
+.topnav { display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 2px solid var(--border); padding-bottom: 0.5rem; }
+.topnav button { padding: 0.5rem 1.2rem; border: none; background: none; cursor: pointer; font-size: 0.95rem; font-weight: 600; color: #888; border-radius: 6px; }
+.topnav button.active { color: var(--navy); background: var(--bg); }
+.new-project-btn { padding: 0.4rem 0.8rem; border: 1px solid var(--blue); color: var(--blue); background: white; border-radius: 6px; cursor: pointer; }
+
+.admin-login { max-width: 360px; margin: 3rem auto; background: white; border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; display: flex; flex-direction: column; gap: 0.8rem; }
+.admin-login label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.85rem; }
+.admin-login input { padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px; }
+.admin-login button { padding: 0.6rem; background: var(--blue); color: white; border: none; border-radius: 6px; cursor: pointer; }
+
+.admin-tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+.admin-tabs button { padding: 0.5rem 1rem; border: 1px solid var(--border); background: white; border-radius: 6px; cursor: pointer; }
+.admin-tabs button.active { background: var(--navy); color: white; border-color: var(--navy); }
+.admin-tabs .logout { margin-left: auto; color: #c0392b; }
+
+.admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 800px) { .admin-grid { grid-template-columns: 1fr; } }
+.admin-card { background: white; border: 1px solid var(--border); border-radius: 10px; padding: 1.2rem; }
+.admin-card h3 { margin-top: 0; color: var(--navy); }
+.admin-card label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.8rem; margin-bottom: 0.6rem; }
+.admin-card input, .admin-card select, .admin-card textarea { padding: 0.45rem; border: 1px solid var(--border); border-radius: 6px; font-family: inherit; font-size: 0.85rem; }
+.admin-card .row { display: flex; gap: 0.6rem; }
+.admin-card .row label { flex: 1; }
+.admin-card .row button { padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid var(--blue); background: var(--blue); color: white; cursor: pointer; }
+.cat-head { text-transform: capitalize; color: var(--blue); margin: 0.8rem 0 0.3rem; border-bottom: 1px solid var(--border); }
+.product-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem 0; border-bottom: 1px solid var(--bg); }
+.product-row img { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; }
+.product-meta { display: flex; flex-direction: column; flex: 1; font-size: 0.8rem; }
+.product-actions { display: flex; gap: 0.3rem; }
+.product-actions button, .img-btn { font-size: 0.75rem; padding: 0.3rem 0.6rem; border: 1px solid var(--border); background: white; border-radius: 5px; cursor: pointer; }
+.img-btn input { display: none; }
+
+.clients-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.clients-table th, .clients-table td { text-align: left; padding: 0.5rem; border-bottom: 1px solid var(--border); }
+.clients-table button { font-size: 0.75rem; padding: 0.3rem 0.6rem; border: 1px solid var(--border); background: white; border-radius: 5px; cursor: pointer; }
+
 footer { display: flex; justify-content: space-between; margin-top: 1.5rem; }
 footer button { padding: 0.5rem 1.2rem; border-radius: 6px; border: 1px solid var(--border); background: white; cursor: pointer; }
