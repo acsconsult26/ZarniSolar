@@ -176,6 +176,10 @@ export default function App() {
 
   return (
     <div className="app">
+      <div className="brand-logo">
+        <img src="/zarni-logo.png" alt="Zarni Electronics" />
+      </div>
+
       <div className="topnav">
         <button className={view === "form" ? "active" : ""} onClick={() => setView("form")}>
           Proposal Form
