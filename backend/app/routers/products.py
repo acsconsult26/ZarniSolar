@@ -15,6 +15,25 @@ router = APIRouter(prefix="/admin/products", tags=["products"])
 CATEGORIES = {"panel", "inverter", "battery"}
 
 
+def _normalize_specs(specs):
+    """Accept either a list of dicts {label,value,unit} or legacy list of
+    strings; always return a list of dicts."""
+    out = []
+    for s in specs or []:
+        if isinstance(s, dict):
+            label = (s.get("label") or "").strip()
+            if not label:
+                continue
+            out.append({
+                "label": label,
+                "value": (s.get("value") or "").strip(),
+                "unit": (s.get("unit") or "").strip(),
+            })
+        elif isinstance(s, str) and s.strip():
+            out.append({"label": s.strip(), "value": "", "unit": ""})
+    return out
+
+
 def _serialize(p: Product) -> dict:
     return {
         "id": p.id,
@@ -23,6 +42,7 @@ def _serialize(p: Product) -> dict:
         "model_name": p.model_name,
         "unit_value": p.unit_value,
         "unit_label": p.unit_label,
+        "spec_title": p.spec_title,
         "specs": p.specs or [],
         "warranty_line": p.warranty_line,
         "image_url": storage.url_for(p.image_path) if storage.exists(p.image_path) else None,
@@ -50,7 +70,8 @@ def create_product(body: dict, db: Session = Depends(get_db)):
         model_name=body.get("model_name", ""),
         unit_value=body.get("unit_value"),
         unit_label=body.get("unit_label"),
-        specs=body.get("specs", []),
+        spec_title=body.get("spec_title"),
+        specs=_normalize_specs(body.get("specs", [])),
         warranty_line=body.get("warranty_line"),
     )
     db.add(p)
@@ -64,9 +85,11 @@ def update_product(product_id: int, body: dict, db: Session = Depends(get_db)):
     p = db.query(Product).get(product_id)
     if not p:
         raise HTTPException(404, "Product not found")
-    for field in ("brand", "model_name", "unit_value", "unit_label", "specs", "warranty_line"):
+    for field in ("brand", "model_name", "unit_value", "unit_label", "spec_title", "warranty_line"):
         if field in body:
             setattr(p, field, body[field])
+    if "specs" in body:
+        p.specs = _normalize_specs(body["specs"])
     if "category" in body and body["category"] in CATEGORIES:
         p.category = body["category"]
     db.commit()
