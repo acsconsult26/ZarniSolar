@@ -9,10 +9,22 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 from pptx import Presentation
+from pptx.dml.color import RGBColor
 from pptx.util import Emu, Pt
 
 from ..schema import merged_field_values
 from .flowchart import render_priority_flowchart
+
+NAVY = RGBColor(0x0D, 0x2C, 0x54)
+WHITE = RGBColor(0xFF, 0xFF, 0xFF)
+DARK = RGBColor(0x22, 0x2A, 0x35)
+
+# category -> (slide index 1-based, spec table shape name, title shape name)
+SPEC_SLIDES = {
+    "inverter": (14, "Table 1", "TextBox 3"),
+    "battery": (15, "Table 4", "TextBox 7"),
+    "panel": (16, "Table 1", "Rectangle 2"),
+}
 
 TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "template.pptx"
 
@@ -158,6 +170,85 @@ def _set_shape_text(shape, text: str):
         run.font.size = size or Pt(12)
 
 
+def _set_first_run_text(shape, text: str):
+    """Set a title shape's text while keeping the first run's formatting."""
+    if shape is None or not shape.has_text_frame:
+        return
+    paras = shape.text_frame.paragraphs
+    if not paras or not paras[0].runs:
+        return
+    paras[0].runs[0].text = text
+    for r in paras[0].runs[1:]:
+        r.text = ""
+    if BURMESE_RE.search(text):
+        paras[0].runs[0].font.name = BURMESE_FONT
+
+
+def _build_spec_table(slide, table_shape_name: str, product: dict):
+    """Replace the brand-specific template table with a clean 3-column
+    (Specification / Value / Unit) table generated from the chosen product's
+    structured specs. Keeps the original table's position and size."""
+    specs = product.get("specs") or []
+    if not specs:
+        return  # nothing to generate; leave template table untouched
+    shape = find_shape(slide.shapes, table_shape_name)
+    if shape is None:
+        return
+    left, top, width, height = shape.left, shape.top, shape.width, shape.height
+    shape._element.getparent().remove(shape._element)
+
+    rows = len(specs) + 1
+    gf = slide.shapes.add_table(rows, 3, left, top, width, height)
+    table = gf.table
+    table.columns[0].width = int(width * 0.55)
+    table.columns[1].width = int(width * 0.30)
+    table.columns[2].width = int(width * 0.15)
+
+    def style_cell(cell, text, *, header=False):
+        cell.fill.solid()
+        cell.fill.fore_color.rgb = NAVY if header else WHITE
+        tf = cell.text_frame
+        tf.word_wrap = True
+        tf.paragraphs[0].text = ""
+        run = tf.paragraphs[0].add_run()
+        run.text = str(text)
+        run.font.size = Pt(11) if header else Pt(10)
+        run.font.bold = header
+        run.font.color.rgb = WHITE if header else DARK
+        if BURMESE_RE.search(str(text)):
+            run.font.name = BURMESE_FONT
+
+    style_cell(table.cell(0, 0), product.get("spec_title") or "Specification", header=True)
+    style_cell(table.cell(0, 1), "Value", header=True)
+    style_cell(table.cell(0, 2), "Unit", header=True)
+    for i, spec in enumerate(specs, start=1):
+        style_cell(table.cell(i, 0), spec.get("label", ""))
+        style_cell(table.cell(i, 1), spec.get("value", ""))
+        style_cell(table.cell(i, 2), spec.get("unit", ""))
+
+
+def _apply_selected_products(prs, selected_products: dict):
+    for category, (slide_idx, table_name, title_name) in SPEC_SLIDES.items():
+        product = selected_products.get(category)
+        if not product:
+            continue
+        slide = prs.slides[slide_idx - 1]
+        title = product.get("spec_title") or f"{product.get('brand', '')} {product.get('model_name', '')}".strip()
+        if title:
+            _set_first_run_text(find_shape(slide.shapes, title_name), title)
+        _build_spec_table(slide, table_name, product)
+
+    # Slide 22 warranty - product warranty lines from the chosen products
+    lines = []
+    for category in ("panel", "inverter", "battery"):
+        product = selected_products.get(category)
+        if product and (product.get("warranty_line") or "").strip():
+            lines.append(product["warranty_line"].strip())
+    if lines:
+        slide22 = prs.slides[21]
+        _set_shape_text(find_shape(slide22.shapes, "Rectangle 47"), "\n".join(lines))
+
+
 def _load_image_bytes(uploads: dict, field: str, storage):
     path = uploads.get(field)
     if not path or not storage.exists(path):
@@ -165,11 +256,16 @@ def _load_image_bytes(uploads: dict, field: str, storage):
     return storage.read_bytes(path)
 
 
-def export_project(project, storage, reference_images: list[bytes] | None = None) -> bytes:
-    """project: has .data (dict), .uploads (dict), .slide19_image_path, .flowchart_image_path"""
+def export_project(project, storage, reference_images: list[bytes] | None = None,
+                   selected_products: dict | None = None) -> bytes:
+    """project: has .data (dict), .uploads (dict), .slide19_image_path, .flowchart_image_path
+    selected_products: {category: product_dict} for slides 14-16 spec tables + warranty"""
     values = merged_field_values(project.data or {})
     prs = Presentation(str(TEMPLATE_PATH))
     replace_tokens(prs, values)
+
+    if selected_products:
+        _apply_selected_products(prs, selected_products)
 
     uploads = project.uploads or {}
     for slide_idx, slots in IMAGE_SLOTS.items():

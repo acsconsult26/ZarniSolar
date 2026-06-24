@@ -43,7 +43,25 @@ function Login({ onLoggedIn }) {
   );
 }
 
-const EMPTY_PRODUCT = { category: "panel", brand: "", model_name: "", unit_value: "", unit_label: "", specs: "", warranty_line: "" };
+const EMPTY_PRODUCT = { category: "panel", brand: "", model_name: "", unit_value: "", unit_label: "", spec_title: "", specs: "", warranty_line: "" };
+
+// specs textarea: one line per row, "Label | Value | Unit"
+function specsToText(specs) {
+  return (specs || [])
+    .map((s) => [s.label || "", s.value || "", s.unit || ""].join(" | ").replace(/( \| )+$/g, ""))
+    .join("\n");
+}
+function textToSpecs(text) {
+  return (text || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [label = "", value = "", unit = ""] = line.split("|").map((s) => s.trim());
+      return { label, value, unit };
+    })
+    .filter((s) => s.label);
+}
 
 function ProductsTab({ token }) {
   const [products, setProducts] = useState([]);
@@ -66,7 +84,8 @@ function ProductsTab({ token }) {
       model_name: p.model_name || "",
       unit_value: p.unit_value ?? "",
       unit_label: p.unit_label || "",
-      specs: (p.specs || []).join("\n"),
+      spec_title: p.spec_title || "",
+      specs: specsToText(p.specs),
       warranty_line: p.warranty_line || "",
     });
   }
@@ -82,7 +101,8 @@ function ProductsTab({ token }) {
       model_name: form.model_name,
       unit_value: form.unit_value === "" ? null : Number(form.unit_value),
       unit_label: form.unit_label,
-      specs: form.specs.split("\n").map((s) => s.trim()).filter(Boolean),
+      spec_title: form.spec_title,
+      specs: textToSpecs(form.specs),
       warranty_line: form.warranty_line,
     };
     try {
@@ -123,8 +143,11 @@ function ProductsTab({ token }) {
           <label><span>Rating value</span><input type="number" value={form.unit_value} onChange={(e) => set("unit_value", e.target.value)} /></label>
           <label><span>Unit (W/kW/kWh)</span><input value={form.unit_label} onChange={(e) => set("unit_label", e.target.value)} /></label>
         </div>
-        <label><span>Specifications (one per line)</span>
-          <textarea rows={5} value={form.specs} onChange={(e) => set("specs", e.target.value)} placeholder="Efficiency: 22.8%&#10;Cell type: Mono" />
+        <label><span>Spec table title (shown on slides 14-16)</span>
+          <input value={form.spec_title} onChange={(e) => set("spec_title", e.target.value)} placeholder="e.g. Sigen 60kW HYB Inverter" />
+        </label>
+        <label><span>Specifications — one row per line as: Label | Value | Unit</span>
+          <textarea rows={6} value={form.specs} onChange={(e) => set("specs", e.target.value)} placeholder={"Max PV Input | 120000 | Wp\nMPPT Trackers | 5 |\nPhases | 3 |"} />
         </label>
         <label><span>Warranty line</span><input value={form.warranty_line} onChange={(e) => set("warranty_line", e.target.value)} /></label>
         {error && <p className="error">{error}</p>}

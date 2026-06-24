@@ -4,7 +4,26 @@ import { SECTIONS, computeTotals } from "./fields";
 import Admin from "./Admin";
 import "./App.css";
 
-function Field({ field, value, onChange, onDraft, drafting }) {
+function Field({ field, value, onChange, onDraft, drafting, catalog, onSelectProduct }) {
+  if (field.type === "product-select") {
+    const options = (catalog || []).filter((p) => p.category === field.category);
+    return (
+      <label className="field">
+        <span>{field.label}</span>
+        <select
+          value={value ?? ""}
+          onChange={(e) => onSelectProduct(field.category, e.target.value)}
+        >
+          <option value="">— none / manual —</option>
+          {options.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.brand} {p.model_name} {p.unit_value ? `(${p.unit_value} ${p.unit_label || ""})` : ""}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+  }
   if (field.type === "textarea") {
     return (
       <label className="field field-wide">
@@ -77,6 +96,35 @@ export default function App() {
   const [exportError, setExportError] = useState(null);
   const [drafting, setDrafting] = useState(false);
   const [view, setView] = useState("form"); // "form" | "admin"
+  const [catalog, setCatalog] = useState([]);
+
+  useEffect(() => {
+    api.listProductsAll().then(setCatalog).catch(() => setCatalog([]));
+  }, [view]);
+
+  function selectProduct(category, productId) {
+    const idField = `${category}_product_id`;
+    if (!productId) {
+      setData((d) => ({ ...d, [idField]: "" }));
+      return;
+    }
+    const p = catalog.find((x) => String(x.id) === String(productId));
+    setData((d) => {
+      const next = { ...d, [idField]: Number(productId) };
+      if (!p) return next;
+      if (category === "inverter") {
+        next.inverter_model = `${p.brand} ${p.model_name}`.trim();
+        if (p.unit_value) next.inverter_unit_kw = p.unit_value;
+      } else if (category === "battery") {
+        next.battery_module = `${p.brand} ${p.model_name}`.trim();
+        if (p.unit_value) next.battery_unit_kwh = p.unit_value;
+      } else if (category === "panel") {
+        next.panel_brand = p.brand;
+        if (p.unit_value) next.panel_watt = p.unit_value;
+      }
+      return next;
+    });
+  }
 
   async function loadProject(id) {
     const p = await api.getProject(id);
@@ -217,7 +265,7 @@ export default function App() {
             <h2>{section.title}</h2>
             <div className="field-grid">
               {section.fields.map((f) => (
-                <Field key={f.name} field={f} value={data[f.name]} onChange={setField} onDraft={handleDraft} drafting={drafting} />
+                <Field key={f.name} field={f} value={data[f.name]} onChange={setField} onDraft={handleDraft} drafting={drafting} catalog={catalog} onSelectProduct={selectProduct} />
               ))}
             </div>
             {section.images && (

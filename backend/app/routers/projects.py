@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Respons
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import Project
+from ..models import Project, Product
 from ..storage import storage
 from ..schema import merged_field_values
 from ..services.pptx_export import export_project
@@ -11,6 +11,28 @@ from ..services.flowchart import render_priority_flowchart
 from ..services.text_drafts import compose_power_priority_draft
 
 router = APIRouter(prefix="/projects", tags=["projects"])
+
+
+def _gather_selected_products(data: dict, db: Session) -> dict:
+    """Build {category: product_dict} from the *_product_id values stored on
+    the project, for the spec-table slides (14-16) and warranty (22)."""
+    selected = {}
+    for category in ("inverter", "battery", "panel"):
+        pid = data.get(f"{category}_product_id")
+        if not pid:
+            continue
+        prod = db.query(Product).get(pid)
+        if prod:
+            selected[category] = {
+                "spec_title": prod.spec_title,
+                "brand": prod.brand,
+                "model_name": prod.model_name,
+                "unit_value": prod.unit_value,
+                "unit_label": prod.unit_label,
+                "specs": prod.specs or [],
+                "warranty_line": prod.warranty_line,
+            }
+    return selected
 
 
 def _serialize(p: Project) -> dict:
@@ -138,7 +160,8 @@ def export(project_id: int, db: Session = Depends(get_db)):
     project = db.query(Project).get(project_id)
     if not project:
         raise HTTPException(404, "Project not found")
-    pptx_bytes = export_project(project, storage)
+    selected_products = _gather_selected_products(project.data or {}, db)
+    pptx_bytes = export_project(project, storage, selected_products=selected_products)
     filename = f"{(project.data or {}).get('site_name') or project.name}_proposal.pptx".replace(" ", "_")
     return Response(
         content=pptx_bytes,
