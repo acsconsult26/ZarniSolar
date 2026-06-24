@@ -9,12 +9,13 @@ function Field({ field, value, onChange, onDraft, drafting, catalog, onSelectPro
     const options = (catalog || []).filter((p) => p.category === field.category);
     return (
       <label className="field">
-        <span>{field.label}</span>
+        <span className="field-label">{field.label}</span>
+        {field.help && <small className="field-help">{field.help}</small>}
         <select
           value={value ?? ""}
           onChange={(e) => onSelectProduct(field.category, e.target.value)}
         >
-          <option value="">— none / manual —</option>
+          <option value="">— ကိုယ်တိုင် ဖြည့်ရန် / မရွေးပါ —</option>
           {options.map((p) => (
             <option key={p.id} value={p.id}>
               {p.brand} {p.model_name} {p.unit_value ? `(${p.unit_value} ${p.unit_label || ""})` : ""}
@@ -27,7 +28,8 @@ function Field({ field, value, onChange, onDraft, drafting, catalog, onSelectPro
   if (field.type === "textarea") {
     return (
       <label className="field field-wide">
-        <span>{field.label}{field.required ? " *" : ""}</span>
+        <span className="field-label">{field.label}{field.required ? " *" : ""}</span>
+        {field.help && <small className="field-help">{field.help}</small>}
         <textarea
           rows={8}
           value={value ?? ""}
@@ -36,7 +38,7 @@ function Field({ field, value, onChange, onDraft, drafting, catalog, onSelectPro
         />
         {field.draft && (
           <button type="button" className="draft-btn" onClick={() => onDraft(field)} disabled={drafting}>
-            {drafting ? "Generating draft…" : "Generate draft from data"}
+            {drafting ? "Draft ထုတ်နေသည်…" : "Draft ထုတ်ရန်"}
           </button>
         )}
       </label>
@@ -44,7 +46,8 @@ function Field({ field, value, onChange, onDraft, drafting, catalog, onSelectPro
   }
   return (
     <label className="field">
-      <span>{field.label}{field.required ? " *" : ""}</span>
+      <span className="field-label">{field.label}{field.required ? " *" : ""}</span>
+      {field.help && <small className="field-help">{field.help}</small>}
       <input
         type={field.type}
         value={value ?? ""}
