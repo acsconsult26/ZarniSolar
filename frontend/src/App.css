@@ -157,6 +157,43 @@ footer button:disabled { opacity: 0.45; cursor: default; }
 .product-actions button:hover, .img-btn:hover { border-color: var(--brand-blue); color: var(--brand-blue); }
 .img-btn input { display: none; }
 
+/* ---------- catalog (full-width table + tabs + modal) ---------- */
+.catalog-card { padding: 1.25rem 1.5rem; }
+.catalog-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.catalog-tabs { display: flex; gap: 0.4rem; }
+.catalog-tabs button { padding: 0.5rem 1rem; border: 1px solid var(--border); background: #fff; border-radius: 999px; cursor: pointer; font: inherit; font-weight: 600; font-size: 0.85rem; color: var(--text-muted); }
+.catalog-tabs button.active { background: var(--brand-blue); color: #fff; border-color: var(--brand-blue); }
+.add-product-btn { padding: 0.55rem 1.1rem; border: none; background: var(--brand-red); color: #fff; border-radius: 10px; cursor: pointer; font: inherit; font-weight: 600; }
+.add-product-btn:hover { filter: brightness(0.93); }
+
+.catalog-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.catalog-table th { text-align: left; padding: 0.7rem 0.6rem; border-bottom: 2px solid var(--border); color: var(--text-muted); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.catalog-table td { padding: 0.65rem 0.6rem; border-bottom: 1px solid var(--bg); vertical-align: middle; }
+.catalog-table tr:hover td { background: #fafbfe; }
+.cat-thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); display: block; }
+.no-thumb { color: var(--text-muted); }
+.empty-row { text-align: center; color: var(--text-muted); padding: 2rem 0; }
+.row-actions { display: flex; gap: 0.35rem; justify-content: flex-end; }
+.row-actions button { font-size: 0.76rem; padding: 0.35rem 0.7rem; border: 1px solid var(--border); background: #fff; border-radius: 8px; cursor: pointer; font-family: inherit; }
+.row-actions button:hover { border-color: var(--brand-blue); color: var(--brand-blue); }
+.row-actions .danger:hover { border-color: var(--brand-red); color: var(--brand-red); }
+
+.modal-overlay { position: fixed; inset: 0; background: rgba(13, 44, 84, 0.45); display: flex; align-items: flex-start; justify-content: center; padding: 3rem 1rem; z-index: 50; overflow-y: auto; }
+.modal { background: var(--surface); border-radius: var(--radius); width: 100%; max-width: 560px; box-shadow: 0 20px 60px rgba(16, 24, 40, 0.25); }
+.modal-head { display: flex; align-items: center; justify-content: space-between; padding: 1.1rem 1.4rem; border-bottom: 1px solid var(--border); }
+.modal-head h3 { margin: 0; color: var(--navy); }
+.modal-close { border: none; background: none; font-size: 1.5rem; line-height: 1; cursor: pointer; color: var(--text-muted); }
+.modal-body { padding: 1.25rem 1.4rem; max-height: 65vh; overflow-y: auto; }
+.modal-body label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.85rem; }
+.modal-body input, .modal-body select, .modal-body textarea { padding: 0.55rem 0.65rem; border: 1px solid var(--border); border-radius: 10px; font: inherit; font-size: 0.88rem; }
+.modal-body input:focus, .modal-body select:focus, .modal-body textarea:focus { outline: none; border-color: var(--brand-blue); box-shadow: 0 0 0 3px rgba(27, 77, 161, 0.12); }
+.modal-body textarea { font-family: var(--mm), "Inter", monospace; resize: vertical; }
+.modal-body .row { display: flex; gap: 0.7rem; }
+.modal-body .row label { flex: 1; }
+.modal-foot { display: flex; justify-content: flex-end; gap: 0.6rem; padding: 1rem 1.4rem; border-top: 1px solid var(--border); }
+.modal-foot button { padding: 0.6rem 1.3rem; border-radius: 10px; border: none; background: var(--brand-blue); color: #fff; cursor: pointer; font: inherit; font-weight: 600; }
+.modal-foot .ghost { background: #fff; color: var(--text-muted); border: 1px solid var(--border); }
+
 .clients-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 .clients-table th { text-align: left; padding: 0.6rem 0.5rem; border-bottom: 2px solid var(--border); color: var(--text-muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
 .clients-table td { padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--bg); }
