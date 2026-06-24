@@ -62,6 +62,16 @@ def update_project(project_id: int, body: dict, db: Session = Depends(get_db)):
     return _serialize(project)
 
 
+@router.delete("/{project_id}")
+def delete_project(project_id: int, db: Session = Depends(get_db)):
+    project = db.query(Project).get(project_id)
+    if not project:
+        raise HTTPException(404, "Project not found")
+    db.delete(project)
+    db.commit()
+    return {"ok": True}
+
+
 @router.post("/{project_id}/uploads")
 def upload_field_image(project_id: int, field: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
     project = db.query(Project).get(project_id)

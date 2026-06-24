@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import { SECTIONS, computeTotals } from "./fields";
+import Admin from "./Admin";
 import "./App.css";
 
 function Field({ field, value, onChange, onDraft, drafting }) {
@@ -75,6 +76,29 @@ export default function App() {
   const [exportBusy, setExportBusy] = useState(false);
   const [exportError, setExportError] = useState(null);
   const [drafting, setDrafting] = useState(false);
+  const [view, setView] = useState("form"); // "form" | "admin"
+
+  async function loadProject(id) {
+    const p = await api.getProject(id);
+    setProjectId(p.id);
+    setName(p.name);
+    setData(p.data || {});
+    setUploads(p.uploads || {});
+    setSlide19Url(p.slide19_image_url ? api.fileUrl(p.slide19_image_url) : null);
+    setStep(0);
+    setView("form");
+  }
+
+  async function newProject() {
+    const p = await api.createProject({ name: "Untitled Project", data: {} });
+    setProjectId(p.id);
+    setName("Untitled Project");
+    setData({});
+    setUploads({});
+    setSlide19Url(null);
+    setStep(0);
+    setView("form");
+  }
 
   async function handleDraft(field) {
     if (!projectId || field.draft !== "slide21") return;
@@ -152,10 +176,24 @@ export default function App() {
 
   return (
     <div className="app">
+      <div className="topnav">
+        <button className={view === "form" ? "active" : ""} onClick={() => setView("form")}>
+          Proposal Form
+        </button>
+        <button className={view === "admin" ? "active" : ""} onClick={() => setView("admin")}>
+          Admin
+        </button>
+      </div>
+
+      {view === "admin" ? (
+        <Admin onEditClient={loadProject} />
+      ) : (
+      <>
       <header>
         <h1>Solar ESS Proposal Generator</h1>
         <input className="project-name" value={name} onChange={(e) => setName(e.target.value)} />
         {projectId && <span className="project-id">Project #{projectId}</span>}
+        <button className="new-project-btn" onClick={newProject}>+ New</button>
       </header>
 
       <nav className="steps">
@@ -274,6 +312,8 @@ export default function App() {
           Next
         </button>
       </footer>
+      </>
+      )}
     </div>
   );
 }
