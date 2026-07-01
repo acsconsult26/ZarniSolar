@@ -309,9 +309,93 @@ function ClientsTab({ onEditClient }) {
   );
 }
 
-export default function Admin({ onEditClient }) {
+function DashboardTab({ onGoTo }) {
+  const [products, setProducts] = useState([]);
+  const [projects, setProjects] = useState([]);
+
+  useEffect(() => {
+    api.listProductsAll().then(setProducts).catch(() => {});
+    api.listProjects().then(setProjects).catch(() => {});
+  }, []);
+
+  const count = (cat) => products.filter((p) => p.category === cat).length;
+  const recent = [...projects]
+    .sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0))
+    .slice(0, 5);
+
+  const stats = [
+    { label: "Total Clients", value: projects.length, accent: "blue", to: "clients" },
+    { label: "Solar Panels", value: count("panel"), accent: "gold", to: "products" },
+    { label: "Inverters", value: count("inverter"), accent: "blue", to: "products" },
+    { label: "Batteries", value: count("battery"), accent: "red", to: "products" },
+  ];
+
+  return (
+    <div>
+      <div className="stat-grid">
+        {stats.map((s) => (
+          <button key={s.label} className={`stat-card accent-${s.accent}`} onClick={() => onGoTo(s.to)}>
+            <span className="stat-value">{s.value}</span>
+            <span className="stat-label">{s.label}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="admin-card" style={{ marginTop: "1.25rem" }}>
+        <h3>Recent Clients</h3>
+        {recent.length === 0 ? (
+          <p className="hint">No clients yet.</p>
+        ) : (
+          <table className="clients-table">
+            <thead><tr><th>#</th><th>Name</th><th>Site</th><th>Updated</th></tr></thead>
+            <tbody>
+              {recent.map((p) => (
+                <tr key={p.id}>
+                  <td>{p.id}</td><td>{p.name}</td><td>{p.data?.site_name || "—"}</td>
+                  <td>{p.updated_at ? new Date(p.updated_at).toLocaleString() : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SettingsTab() {
+  return (
+    <div className="admin-card">
+      <h3>Settings</h3>
+      <div className="settings-block">
+        <h4>Admin Account</h4>
+        <p className="hint">Signed in as <strong>admin@zarni.com</strong> (demo account).</p>
+        <p className="hint">To change the login, set <code>ADMIN_EMAIL</code> / <code>ADMIN_PASSWORD</code> as environment variables on the backend host.</p>
+      </div>
+      <div className="settings-block">
+        <h4>AI Image (Slide 19)</h4>
+        <p className="hint">Set <code>IMAGE_GEN_PROVIDER</code> and <code>IMAGE_GEN_API_KEY</code> on the backend to enable the slide-19 infographic generation.</p>
+      </div>
+      <div className="settings-block">
+        <h4>About</h4>
+        <p className="hint">Zarni Solar — ESS Proposal Generator. Data is stored in the connected database; exported decks are generated on demand.</p>
+      </div>
+    </div>
+  );
+}
+
+const NAV = [
+  { key: "dashboard", label: "Dashboard", icon: "▦" },
+  { key: "products", label: "Products", icon: "▢" },
+  { key: "clients", label: "Clients", icon: "☺" },
+  { key: "settings", label: "Settings", icon: "⚙" },
+];
+
+const PAGE_TITLES = { dashboard: "Dashboard", products: "Product Catalog", clients: "Clients & History", settings: "Settings" };
+
+export default function Admin({ onEditClient, onExit }) {
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
-  const [tab, setTab] = useState("products");
+  const [tab, setTab] = useState("dashboard");
 
   function logout() {
     localStorage.removeItem(TOKEN_KEY);
@@ -321,13 +405,36 @@ export default function Admin({ onEditClient }) {
   if (!token) return <Login onLoggedIn={setToken} />;
 
   return (
-    <div className="admin">
-      <div className="admin-tabs">
-        <button className={tab === "products" ? "active" : ""} onClick={() => setTab("products")}>Products</button>
-        <button className={tab === "clients" ? "active" : ""} onClick={() => setTab("clients")}>Clients & History</button>
-        <button className="logout" onClick={logout}>Log out</button>
-      </div>
-      {tab === "products" ? <ProductsTab token={token} /> : <ClientsTab onEditClient={onEditClient} />}
+    <div className="admin-shell">
+      <aside className="admin-sidebar">
+        <div className="sidebar-brand">
+          <img src="/zarni-logo.png" alt="Zarni" />
+          <span>Zarni Admin</span>
+        </div>
+        <nav className="sidebar-nav">
+          {NAV.map((n) => (
+            <button key={n.key} className={tab === n.key ? "active" : ""} onClick={() => setTab(n.key)}>
+              <span className="nav-icon">{n.icon}</span> {n.label}
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-foot">
+          <button className="sidebar-link" onClick={onExit}>← Proposal Form</button>
+          <button className="sidebar-logout" onClick={logout}>Log out</button>
+        </div>
+      </aside>
+
+      <main className="admin-main">
+        <header className="admin-topbar">
+          <h2>{PAGE_TITLES[tab]}</h2>
+        </header>
+        <div className="admin-content">
+          {tab === "dashboard" && <DashboardTab onGoTo={setTab} />}
+          {tab === "products" && <ProductsTab token={token} />}
+          {tab === "clients" && <ClientsTab onEditClient={onEditClient} />}
+          {tab === "settings" && <SettingsTab />}
+        </div>
+      </main>
     </div>
   );
 }
