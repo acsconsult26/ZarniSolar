@@ -394,16 +394,46 @@ def _load_image_bytes(uploads: dict, field: str, storage):
     return storage.read_bytes(path)
 
 
+def _company_tokens(company_info: dict) -> dict:
+    """Flatten the admin company_info boilerplate into slide-2 tokens."""
+    ci = company_info or {}
+    branches = ci.get("branches") or [{}, {}]
+    b1 = branches[0] if len(branches) > 0 else {}
+    b2 = branches[1] if len(branches) > 1 else {}
+    return {
+        "company_name": ci.get("company_name", ""),
+        "website": ci.get("website", ""),
+        "branch1_address": b1.get("address", ""),
+        "branch1_phone": b1.get("phone", ""),
+        "branch2_address": b2.get("address", ""),
+        "branch2_phone": b2.get("phone", ""),
+    }
+
+
 def export_project(project, storage, reference_images: list[bytes] | None = None,
-                   selected_products: dict | None = None) -> bytes:
+                   selected_products: dict | None = None,
+                   company_info: dict | None = None,
+                   warranty_defaults: list | None = None) -> bytes:
     """project: has .data (dict), .uploads (dict), .slide19_image_path, .flowchart_image_path
-    selected_products: {category: product_dict} for slides 14-16 spec tables + warranty"""
+    selected_products: {category: product_dict} for slides 14-16 spec tables + warranty
+    company_info: admin boilerplate for slide 2; warranty_defaults: fallback slide-22 lines"""
     values = merged_field_values(project.data or {})
+    if company_info:
+        values.update(_company_tokens(company_info))
     prs = Presentation(str(TEMPLATE_PATH))
     replace_tokens(prs, values)
 
     if selected_products:
         _apply_selected_products(prs, selected_products, storage)
+
+    # Slide 22 warranty fallback: if no product warranties were applied, use the
+    # admin's default warranty lines (if any).
+    has_product_warranty = any(
+        (selected_products or {}).get(c, {}).get("warranty_line") for c in ("panel", "inverter", "battery")
+    )
+    if not has_product_warranty and warranty_defaults:
+        slide22 = prs.slides[21]
+        _set_shape_text(find_shape(slide22.shapes, "Rectangle 47"), "\n".join(warranty_defaults))
 
     uploads = project.uploads or {}
     for slide_idx, slots in IMAGE_SLOTS.items():
