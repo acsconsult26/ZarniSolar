@@ -43,35 +43,68 @@ function Login({ onLoggedIn }) {
   );
 }
 
-const EMPTY_PRODUCT = { category: "panel", brand: "", model_name: "", unit_value: "", unit_label: "", spec_title: "", specs: "", warranty_line: "" };
+const EMPTY_PRODUCT = { category: "panel", brand: "", model_name: "", unit_value: "", unit_label: "", spec_title: "", warranty_line: "" };
 
-// specs textarea: one line per row, "Label | Value | Unit"
-function specsToText(specs) {
-  return (specs || [])
-    .map((s) => [s.label || "", s.value || "", s.unit || ""].join(" | ").replace(/( \| )+$/g, ""))
-    .join("\n");
+// Category-specific spec fields (from the manufacturer datasheets). Each row
+// becomes a spec line { label, value, unit } used to build the slide table.
+const SPEC_FIELDS = {
+  inverter: [
+    { label: "Max. PV Input Power", unit: "Wp" },
+    { label: "Max. DC Input Voltage", unit: "V" },
+    { label: "Nominal DC Input Voltage", unit: "V" },
+    { label: "Start-up Voltage", unit: "V" },
+    { label: "MPPT Voltage Range", unit: "V" },
+    { label: "Number of MPP Trackers", unit: "" },
+    { label: "PV Strings per MPPT", unit: "" },
+    { label: "Max. Input Current per MPPT", unit: "A" },
+    { label: "Max. Short-circuit Current per MPPT", unit: "A" },
+  ],
+  battery: [
+    { label: "Battery Type", unit: "" },
+    { label: "Cell Capacity", unit: "Ah" },
+    { label: "Cycle Life", unit: "" },
+    { label: "Total Energy Capacity per Module", unit: "kWh" },
+    { label: "Weight", unit: "kg" },
+    { label: "Dimensions (W/H/D)", unit: "mm" },
+    { label: "Nominal Charge/Discharge Rate", unit: "" },
+    { label: "Max. Charge/Discharge Rate", unit: "" },
+  ],
+  panel: [
+    { label: "Product Name", unit: "" },
+    { label: "Max Power (Pmax)", unit: "W" },
+    { label: "Open Circuit Voltage (Voc)", unit: "V" },
+    { label: "Short Circuit Current (Isc)", unit: "A" },
+    { label: "Max Power Voltage (Vmp)", unit: "V" },
+    { label: "Max Power Current (Imp)", unit: "A" },
+    { label: "Module Efficiency", unit: "%" },
+    { label: "Weight", unit: "kg" },
+    { label: "Dimension (W x H x Thickness)", unit: "mm" },
+  ],
+};
+
+// specs rows <-> {label: value} map keyed by the field labels above
+function specsToValues(specs) {
+  const map = {};
+  (specs || []).forEach((s) => { if (s.label) map[s.label] = s.value ?? ""; });
+  return map;
 }
-function textToSpecs(text) {
-  return (text || "")
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [label = "", value = "", unit = ""] = line.split("|").map((s) => s.trim());
-      return { label, value, unit };
-    })
-    .filter((s) => s.label);
+function valuesToSpecs(category, values) {
+  return (SPEC_FIELDS[category] || [])
+    .map((f) => ({ label: f.label, value: (values[f.label] ?? "").trim(), unit: f.unit }))
+    .filter((s) => s.value !== "");
 }
 
 const CATEGORY_LABELS = { panel: "Solar Panel", inverter: "Inverter", battery: "Battery" };
 
 function ProductModal({ token, initial, onClose, onSaved }) {
   const [form, setForm] = useState(initial);
+  const [specValues, setSpecValues] = useState(initial.specValues || {});
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const editingId = initial.id || null;
 
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })); }
+  function setSpec(label, v) { setSpecValues((s) => ({ ...s, [label]: v })); }
 
   async function save(e) {
     e.preventDefault();
@@ -84,7 +117,7 @@ function ProductModal({ token, initial, onClose, onSaved }) {
       unit_value: form.unit_value === "" ? null : Number(form.unit_value),
       unit_label: form.unit_label,
       spec_title: form.spec_title,
-      specs: textToSpecs(form.specs),
+      specs: valuesToSpecs(form.category, specValues),
       warranty_line: form.warranty_line,
     };
     try {
@@ -98,6 +131,8 @@ function ProductModal({ token, initial, onClose, onSaved }) {
       setBusy(false);
     }
   }
+
+  const specFields = SPEC_FIELDS[form.category] || [];
 
   return (
     <div className="modal-overlay" onMouseDown={onClose}>
@@ -117,15 +152,23 @@ function ProductModal({ token, initial, onClose, onSaved }) {
           </div>
           <label><span>Model name</span><input value={form.model_name} onChange={(e) => set("model_name", e.target.value)} /></label>
           <div className="row">
-            <label><span>Rating value</span><input type="number" value={form.unit_value} onChange={(e) => set("unit_value", e.target.value)} /></label>
+            <label><span>Rating value (for form auto-fill)</span><input type="number" value={form.unit_value} onChange={(e) => set("unit_value", e.target.value)} /></label>
             <label><span>Unit (W/kW/kWh)</span><input value={form.unit_label} onChange={(e) => set("unit_label", e.target.value)} /></label>
           </div>
           <label><span>Spec table title (shown on slides 14-16)</span>
             <input value={form.spec_title} onChange={(e) => set("spec_title", e.target.value)} placeholder="e.g. Sigen 60kW HYB Inverter" />
           </label>
-          <label><span>Specifications — one row per line as: Label | Value | Unit</span>
-            <textarea rows={6} value={form.specs} onChange={(e) => set("specs", e.target.value)} placeholder={"Max PV Input | 120000 | Wp\nMPPT Trackers | 5 |\nPhases | 3 |"} />
-          </label>
+
+          <div className="spec-section">
+            <h4>{CATEGORY_LABELS[form.category]} Specifications</h4>
+            {specFields.map((f) => (
+              <label key={f.label} className="spec-field">
+                <span>{f.label}{f.unit ? ` (${f.unit})` : ""}</span>
+                <input value={specValues[f.label] ?? ""} onChange={(e) => setSpec(f.label, e.target.value)} />
+              </label>
+            ))}
+          </div>
+
           <label><span>Warranty line</span><input value={form.warranty_line} onChange={(e) => set("warranty_line", e.target.value)} /></label>
           <label><span>Product image</span>
             <input type="file" accept="image/*" onChange={(e) => set("_imageFile", e.target.files[0])} />
@@ -159,7 +202,7 @@ function ProductsTab({ token }) {
       unit_value: p.unit_value ?? "",
       unit_label: p.unit_label || "",
       spec_title: p.spec_title || "",
-      specs: specsToText(p.specs),
+      specValues: specsToValues(p.specs),
       warranty_line: p.warranty_line || "",
     });
   }

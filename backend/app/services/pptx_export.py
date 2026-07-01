@@ -19,11 +19,11 @@ NAVY = RGBColor(0x0D, 0x2C, 0x54)
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
 DARK = RGBColor(0x22, 0x2A, 0x35)
 
-# category -> (slide index 1-based, spec table shape name, title shape name)
+# category -> (slide index 1-based, spec table shape, title shape, product image shape)
 SPEC_SLIDES = {
-    "inverter": (14, "Table 1", "TextBox 3"),
-    "battery": (15, "Table 4", "TextBox 7"),
-    "panel": (16, "Table 1", "Rectangle 2"),
+    "inverter": (14, "Table 1", "TextBox 3", "Picture 2"),
+    "battery": (15, "Table 4", "TextBox 7", "Picture 3"),
+    "panel": (16, "Table 1", "Rectangle 2", "Picture 2"),
 }
 
 TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "template.pptx"
@@ -227,8 +227,8 @@ def _build_spec_table(slide, table_shape_name: str, product: dict):
         style_cell(table.cell(i, 2), spec.get("unit", ""))
 
 
-def _apply_selected_products(prs, selected_products: dict):
-    for category, (slide_idx, table_name, title_name) in SPEC_SLIDES.items():
+def _apply_selected_products(prs, selected_products: dict, storage=None):
+    for category, (slide_idx, table_name, title_name, image_name) in SPEC_SLIDES.items():
         product = selected_products.get(category)
         if not product:
             continue
@@ -237,6 +237,10 @@ def _apply_selected_products(prs, selected_products: dict):
         if title:
             _set_first_run_text(find_shape(slide.shapes, title_name), title)
         _build_spec_table(slide, table_name, product)
+        # Swap the product image (aspect-preserving) if one was uploaded
+        img_path = product.get("image_path")
+        if storage is not None and storage.exists(img_path):
+            _replace_picture_contain(slide, image_name, storage.read_bytes(img_path))
 
     # Slide 22 warranty - product warranty lines from the chosen products
     lines = []
@@ -265,7 +269,7 @@ def export_project(project, storage, reference_images: list[bytes] | None = None
     replace_tokens(prs, values)
 
     if selected_products:
-        _apply_selected_products(prs, selected_products)
+        _apply_selected_products(prs, selected_products, storage)
 
     uploads = project.uploads or {}
     for slide_idx, slots in IMAGE_SLOTS.items():
