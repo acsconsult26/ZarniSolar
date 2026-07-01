@@ -10,10 +10,22 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 from pptx import Presentation
 from pptx.dml.color import RGBColor
-from pptx.util import Emu, Pt
+from pptx.enum.text import PP_ALIGN
+from pptx.util import Emu, Inches, Pt
 
 from ..schema import merged_field_values
 from .flowchart import render_priority_flowchart
+
+CONTENTS_ITEMS = [
+    "Project Objectives",
+    "Surveying Data (Project Background)",
+    "System Requirement",
+    "Technical Proposal",
+    "Product Specification",
+    "Technical Advantages",
+    "Solar Panel Support Mounting Structure",
+    "Warranty",
+]
 
 NAVY = RGBColor(0x0D, 0x2C, 0x54)
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
@@ -170,6 +182,128 @@ def _set_shape_text(shape, text: str):
         run.font.size = size or Pt(12)
 
 
+def _new_run(paragraph, text, *, size=18, bold=False, color=DARK):
+    run = paragraph.add_run()
+    run.text = text
+    run.font.size = Pt(size)
+    run.font.bold = bold
+    run.font.color.rgb = color
+    if BURMESE_RE.search(text):
+        run.font.name = BURMESE_FONT
+    return run
+
+
+def _add_blank_slide(prs):
+    """Add a slide on the Blank layout (index 6, falling back to the last)."""
+    layouts = prs.slide_layouts
+    layout = layouts[6] if len(layouts) > 6 else layouts[-1]
+    return prs.slides.add_slide(layout)
+
+
+def _slide_title(slide, prs, text):
+    box = slide.shapes.add_textbox(Inches(0.7), Inches(0.5), prs.slide_width - Inches(1.4), Inches(1.1))
+    p = box.text_frame.paragraphs[0]
+    _new_run(p, text, size=34, bold=True, color=NAVY)
+    # brand accent bar under the title
+    bar = slide.shapes.add_shape(1, Inches(0.75), Inches(1.55), Inches(2.2), Pt(4))
+    bar.fill.solid(); bar.fill.fore_color.rgb = RGBColor(0xE2, 0x23, 0x1A)
+    bar.line.fill.background()
+    return box
+
+
+def _build_contents_slide(slide, prs):
+    _slide_title(slide, prs, "Contents")
+    box = slide.shapes.add_textbox(Inches(1.2), Inches(2.1), prs.slide_width - Inches(2.4), prs.slide_height - Inches(3))
+    tf = box.text_frame
+    tf.word_wrap = True
+    for i, item in enumerate(CONTENTS_ITEMS):
+        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        p.space_after = Pt(10)
+        _new_run(p, f"{i + 1}.  ", size=22, bold=True, color=NAVY)
+        _new_run(p, item, size=22, color=DARK)
+
+
+def _build_objectives_slide(slide, prs, text):
+    _slide_title(slide, prs, "Project Objectives")
+    box = slide.shapes.add_textbox(Inches(1.2), Inches(2.1), prs.slide_width - Inches(2.4), prs.slide_height - Inches(3))
+    tf = box.text_frame
+    tf.word_wrap = True
+    lines = [ln for ln in (text or "").split("\n")] or [""]
+    for i, line in enumerate(lines):
+        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        p.space_after = Pt(8)
+        stripped = line.strip()
+        if stripped:
+            _new_run(p, "•  ", size=18, bold=True, color=RGBColor(0xE2, 0x23, 0x1A))
+            _new_run(p, stripped, size=18, color=DARK)
+
+
+def _build_surveying_slide(slide, prs, data, uploads, storage):
+    _slide_title(slide, prs, "Surveying Data")
+    col_w = (prs.slide_width - Inches(2)) / 2
+    box = slide.shapes.add_textbox(Inches(0.9), Inches(2.1), col_w, prs.slide_height - Inches(3))
+    tf = box.text_frame
+    tf.word_wrap = True
+
+    def field(label, value, first=False):
+        p = tf.paragraphs[0] if first else tf.add_paragraph()
+        p.space_after = Pt(12)
+        _new_run(p, f"{label}: ", size=18, bold=True, color=NAVY)
+        _new_run(p, str(value or "—"), size=18, color=DARK)
+
+    lat, lng = data.get("survey_lat"), data.get("survey_lng")
+    latlng = f"{lat}, {lng}" if (lat or lng) else "—"
+    field("Project Location", data.get("survey_location_name"), first=True)
+    field("Map Location (Lat, Long)", latlng)
+    area = data.get("install_area_sqft")
+    field("Solar Panel Installation Area", f"{area} sq ft" if area else "—")
+
+    # Project Solution (longer text) below
+    p = tf.add_paragraph(); p.space_before = Pt(10)
+    _new_run(p, "Project Solution:", size=18, bold=True, color=NAVY)
+    for ln in (data.get("project_solution") or "").split("\n"):
+        if ln.strip():
+            pp = tf.add_paragraph()
+            _new_run(pp, ln.strip(), size=15, color=DARK)
+
+    # Optional image on the right column
+    img_path = (uploads or {}).get("survey_image")
+    if storage is not None and storage.exists(img_path):
+        try:
+            data_bytes = storage.read_bytes(img_path)
+            with Image.open(io.BytesIO(data_bytes)) as im:
+                iw, ih = im.size
+            box_w = int(col_w); box_h = int(prs.slide_height - Inches(3))
+            left0 = int(Inches(1) + col_w); top0 = int(Inches(2.1))
+            scale = min(box_w / iw, box_h / ih)
+            w, h = int(iw * scale), int(ih * scale)
+            slide.shapes.add_picture(io.BytesIO(data_bytes), left0 + (box_w - w) // 2, top0, w, h)
+        except Exception:
+            pass
+
+
+def _move_after_cover(prs, sld_id_elems):
+    """Move the given <p:sldId> elements to sit right after the cover slide."""
+    sld_id_lst = prs.slides._sldIdLst
+    for elem in sld_id_elems:
+        sld_id_lst.remove(elem)
+    insert_at = 1  # after cover (index 0)
+    for offset, elem in enumerate(sld_id_elems):
+        sld_id_lst.insert(insert_at + offset, elem)
+
+
+def build_extra_slides(prs, data, uploads, storage):
+    """Append the 3 new slides then reorder them to positions 2, 3, 4."""
+    sld_id_lst = prs.slides._sldIdLst
+    new_ids = []
+
+    s = _add_blank_slide(prs); _build_contents_slide(s, prs); new_ids.append(sld_id_lst[-1])
+    s = _add_blank_slide(prs); _build_objectives_slide(s, prs, data.get("project_objectives")); new_ids.append(sld_id_lst[-1])
+    s = _add_blank_slide(prs); _build_surveying_slide(s, prs, data, uploads, storage); new_ids.append(sld_id_lst[-1])
+
+    _move_after_cover(prs, new_ids)
+
+
 def _set_first_run_text(shape, text: str):
     """Set a title shape's text while keeping the first run's formatting."""
     if shape is None or not shape.has_text_frame:
@@ -324,6 +458,10 @@ def export_project(project, storage, reference_images: list[bytes] | None = None
         ]
         for shape, img in zip(photo_shapes, reference_images):
             _replace_picture(slide23, shape.name, img)
+
+    # Insert the 3 new slides (Contents / Project Objectives / Surveying Data)
+    # LAST, so all the index-based operations above ran on the original deck.
+    build_extra_slides(prs, project.data or {}, uploads, storage)
 
     out = io.BytesIO()
     prs.save(out)

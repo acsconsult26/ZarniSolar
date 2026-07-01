@@ -11,6 +11,25 @@ export const SECTIONS = [
     ],
   },
   {
+    key: "objectives",
+    title: "Project Objectives (Slide 3)",
+    fields: [
+      { name: "project_objectives", label: "Project Objectives", help: "စီမံကိန်း၏ ရည်ရွယ်ချက်များ။ စာကြောင်းတစ်ကြောင်းစီ bullet အဖြစ် ပြပါမည်။ ဥပမာ — 24/7 စဉ်ဆက်မပြတ် ဓာတ်အား", type: "textarea", lang: "mm" },
+    ],
+  },
+  {
+    key: "surveying",
+    title: "Surveying Data (Slide 4)",
+    fields: [
+      { name: "survey_location_name", label: "Project Location (Name)", help: "Site တည်နေရာ အမည်။ ဥပမာ — MRTV Sagaing", type: "text" },
+      { name: "survey_lat", label: "Map Location — Latitude", help: "မြေပုံ တည်နေရာ Latitude။ ဥပမာ — 21.9022", type: "number" },
+      { name: "survey_lng", label: "Map Location — Longitude", help: "မြေပုံ တည်နေရာ Longitude။ ဥပမာ — 95.9923", type: "number" },
+      { name: "install_area_sqft", label: "Solar Panel Installation Area (sq ft)", help: "Solar တပ်ဆင်မည့် ဧရိယာ (စတုရန်းပေ)။ ဥပမာ — 5000", type: "number" },
+      { name: "project_solution", label: "Project Solution", help: "စီမံကိန်း ဖြေရှင်းချက် အသေးစိတ် (long text)။", type: "textarea", lang: "mm" },
+    ],
+    images: [{ name: "survey_image", label: "Project Location ဓာတ်ပုံ" }],
+  },
+  {
     key: "site",
     title: "စီမံကိန်း နောက်ခံ နှင့် နေရာ",
     fields: [
