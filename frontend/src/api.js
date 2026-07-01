@@ -117,6 +117,15 @@ export const api = {
 
   deleteProject: (id) =>
     fetch(`${API_BASE}/projects/${id}`, { method: "DELETE" }).then(json),
+
+  getBoilerplate: (key) => fetch(`${API_BASE}/admin/boilerplate/${key}`).then(json),
+
+  putBoilerplate: (token, key, value) =>
+    fetch(`${API_BASE}/admin/boilerplate/${key}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(value),
+    }).then(json),
 };
 
 export default API_BASE;

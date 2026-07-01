@@ -312,10 +312,12 @@ function ClientsTab({ onEditClient }) {
 function DashboardTab({ onGoTo }) {
   const [products, setProducts] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [exportStats, setExportStats] = useState({ total: 0, by_month: {} });
 
   useEffect(() => {
     api.listProductsAll().then(setProducts).catch(() => {});
     api.listProjects().then(setProjects).catch(() => {});
+    api.getBoilerplate("export_stats").then((s) => setExportStats(s || { total: 0, by_month: {} })).catch(() => {});
   }, []);
 
   const count = (cat) => products.filter((p) => p.category === cat).length;
@@ -323,12 +325,25 @@ function DashboardTab({ onGoTo }) {
     .sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0))
     .slice(0, 5);
 
+  const thisMonth = new Date().toISOString().slice(0, 7);
+  const exportsThisMonth = (exportStats.by_month || {})[thisMonth] || 0;
+
   const stats = [
     { label: "Total Clients", value: projects.length, accent: "blue", to: "clients" },
-    { label: "Solar Panels", value: count("panel"), accent: "gold", to: "products" },
-    { label: "Inverters", value: count("inverter"), accent: "blue", to: "products" },
-    { label: "Batteries", value: count("battery"), accent: "red", to: "products" },
+    { label: "Products", value: products.length, accent: "gold", to: "products" },
+    { label: "Exports (Total)", value: exportStats.total || 0, accent: "red", to: "clients" },
+    { label: "Exports This Month", value: exportsThisMonth, accent: "blue", to: "clients" },
   ];
+
+  const cats = [
+    { key: "panel", label: "Solar Panels", color: "var(--brand-gold)" },
+    { key: "inverter", label: "Inverters", color: "var(--brand-blue)" },
+    { key: "battery", label: "Batteries", color: "var(--brand-red)" },
+  ];
+  const maxCat = Math.max(1, ...cats.map((c) => count(c.key)));
+
+  const months = Object.keys(exportStats.by_month || {}).sort().slice(-6);
+  const maxMonth = Math.max(1, ...months.map((m) => exportStats.by_month[m]));
 
   return (
     <div>
@@ -339,6 +354,37 @@ function DashboardTab({ onGoTo }) {
             <span className="stat-label">{s.label}</span>
           </button>
         ))}
+      </div>
+
+      <div className="widget-grid">
+        <div className="admin-card">
+          <h3>Products by Category</h3>
+          {cats.map((c) => (
+            <div key={c.key} className="bar-row">
+              <span className="bar-label">{c.label}</span>
+              <div className="bar-track">
+                <div className="bar-fill" style={{ width: `${(count(c.key) / maxCat) * 100}%`, background: c.color }} />
+              </div>
+              <span className="bar-value">{count(c.key)}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="admin-card">
+          <h3>Exports (last 6 months)</h3>
+          {months.length === 0 ? (
+            <p className="hint">No exports yet.</p>
+          ) : (
+            <div className="col-chart">
+              {months.map((m) => (
+                <div key={m} className="col-item">
+                  <div className="col-bar" style={{ height: `${(exportStats.by_month[m] / maxMonth) * 100}%` }} title={`${exportStats.by_month[m]} exports`} />
+                  <span className="col-label">{m.slice(5)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="admin-card" style={{ marginTop: "1.25rem" }}>
@@ -363,22 +409,79 @@ function DashboardTab({ onGoTo }) {
   );
 }
 
-function SettingsTab() {
+function SettingsTab({ token }) {
+  const [company, setCompany] = useState(null);
+  const [warranty, setWarranty] = useState("");
+  const [prompt, setPrompt] = useState("");
+  const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    api.getBoilerplate("company_info").then(setCompany).catch(() => {});
+    api.getBoilerplate("warranty_lines").then((l) => setWarranty((l || []).join("\n"))).catch(() => {});
+    api.getBoilerplate("slide19_prompt_template").then((p) => setPrompt(typeof p === "string" ? p : "")).catch(() => {});
+  }, []);
+
+  function setBranch(i, k, v) {
+    setCompany((c) => {
+      const branches = [...(c.branches || [{}, {}])];
+      branches[i] = { ...branches[i], [k]: v };
+      return { ...c, branches };
+    });
+  }
+
+  async function saveCompany() {
+    await api.putBoilerplate(token, "company_info", company);
+    flash("Company info saved — appears on slide 2 (Company/Branches).");
+  }
+  async function saveWarranty() {
+    await api.putBoilerplate(token, "warranty_lines", warranty.split("\n").map((s) => s.trim()).filter(Boolean));
+    flash("Warranty defaults saved — used on slide 22 when no product warranty is selected.");
+  }
+  async function savePrompt() {
+    await api.putBoilerplate(token, "slide19_prompt_template", prompt);
+    flash("Slide-19 AI prompt saved.");
+  }
+  function flash(msg) { setStatus(msg); setTimeout(() => setStatus(""), 4000); }
+
+  if (!company) return <div className="admin-card"><p className="hint">Loading settings…</p></div>;
+  const branches = company.branches || [{}, {}];
+
   return (
-    <div className="admin-card">
-      <h3>Settings</h3>
-      <div className="settings-block">
-        <h4>Admin Account</h4>
-        <p className="hint">Signed in as <strong>admin@zarni.com</strong> (demo account).</p>
-        <p className="hint">To change the login, set <code>ADMIN_EMAIL</code> / <code>ADMIN_PASSWORD</code> as environment variables on the backend host.</p>
+    <div className="settings-grid">
+      {status && <div className="settings-status">{status}</div>}
+
+      <div className="admin-card">
+        <h3>Company Info (Slide 2)</h3>
+        <label><span>Company name</span><input value={company.company_name || ""} onChange={(e) => setCompany({ ...company, company_name: e.target.value })} /></label>
+        <label><span>Website</span><input value={company.website || ""} onChange={(e) => setCompany({ ...company, website: e.target.value })} /></label>
+        {[0, 1].map((i) => (
+          <div key={i} className="branch-block">
+            <h4>Branch {i + 1}</h4>
+            <label><span>Address</span><input value={branches[i]?.address || ""} onChange={(e) => setBranch(i, "address", e.target.value)} /></label>
+            <label><span>Phone</span><input value={branches[i]?.phone || ""} onChange={(e) => setBranch(i, "phone", e.target.value)} /></label>
+          </div>
+        ))}
+        <div className="row"><button onClick={saveCompany}>Save Company Info</button></div>
       </div>
-      <div className="settings-block">
-        <h4>AI Image (Slide 19)</h4>
-        <p className="hint">Set <code>IMAGE_GEN_PROVIDER</code> and <code>IMAGE_GEN_API_KEY</code> on the backend to enable the slide-19 infographic generation.</p>
+
+      <div className="admin-card">
+        <h3>Default Warranty Lines (Slide 22)</h3>
+        <p className="hint">Used when a proposal has no catalog products with warranty. One line each.</p>
+        <textarea rows={5} value={warranty} onChange={(e) => setWarranty(e.target.value)} />
+        <div className="row"><button onClick={saveWarranty}>Save Warranty</button></div>
       </div>
-      <div className="settings-block">
-        <h4>About</h4>
-        <p className="hint">Zarni Solar — ESS Proposal Generator. Data is stored in the connected database; exported decks are generated on demand.</p>
+
+      <div className="admin-card">
+        <h3>Slide-19 AI Prompt Template</h3>
+        <p className="hint">Placeholders like {"{site_name}"}, {"{total_solar_kwp}"}, {"{panel_qty}"} are filled from the project.</p>
+        <textarea rows={10} value={prompt} onChange={(e) => setPrompt(e.target.value)} />
+        <div className="row"><button onClick={savePrompt}>Save Prompt</button></div>
+      </div>
+
+      <div className="admin-card">
+        <h3>Backend Settings (read-only)</h3>
+        <div className="settings-block"><h4>Admin Account</h4><p className="hint">Change via <code>ADMIN_EMAIL</code> / <code>ADMIN_PASSWORD</code> env vars.</p></div>
+        <div className="settings-block"><h4>AI Provider</h4><p className="hint">Set <code>IMAGE_GEN_PROVIDER</code> / <code>IMAGE_GEN_API_KEY</code> env vars to enable slide-19 generation.</p></div>
       </div>
     </div>
   );
@@ -432,7 +535,7 @@ export default function Admin({ onEditClient, onExit }) {
           {tab === "dashboard" && <DashboardTab onGoTo={setTab} />}
           {tab === "products" && <ProductsTab token={token} />}
           {tab === "clients" && <ClientsTab onEditClient={onEditClient} />}
-          {tab === "settings" && <SettingsTab />}
+          {tab === "settings" && <SettingsTab token={token} />}
         </div>
       </main>
     </div>

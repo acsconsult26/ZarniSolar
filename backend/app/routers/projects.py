@@ -9,6 +9,7 @@ from ..services.pptx_export import export_project
 from ..services import imagegen
 from ..services.flowchart import render_priority_flowchart
 from ..services.text_drafts import compose_power_priority_draft
+from .. import boilerplate as bp
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -114,7 +115,7 @@ def generate_slide19(project_id: int, body: dict, db: Session = Depends(get_db))
     if not project:
         raise HTTPException(404, "Project not found")
     values = merged_field_values(project.data or {})
-    template = body.get("prompt_template") or imagegen.DEFAULT_PROMPT_TEMPLATE
+    template = body.get("prompt_template") or bp.read(db, "slide19_prompt_template") or imagegen.DEFAULT_PROMPT_TEMPLATE
     try:
         prompt = imagegen.render_prompt(template, values)
         img_bytes = imagegen.generate_image(prompt)
@@ -162,7 +163,21 @@ def export(project_id: int, db: Session = Depends(get_db)):
     if not project:
         raise HTTPException(404, "Project not found")
     selected_products = _gather_selected_products(project.data or {}, db)
-    pptx_bytes = export_project(project, storage, selected_products=selected_products)
+    company_info = bp.read(db, "company_info")
+    warranty_defaults = bp.read(db, "warranty_lines")
+    pptx_bytes = export_project(
+        project, storage,
+        selected_products=selected_products,
+        company_info=company_info,
+        warranty_defaults=warranty_defaults,
+    )
+    # track export stats (month bucket) for the dashboard
+    import datetime as _dt
+    stats = dict(bp.read(db, "export_stats") or {})
+    by_month = dict(stats.get("by_month") or {})
+    m = _dt.date.today().strftime("%Y-%m")
+    by_month[m] = by_month.get(m, 0) + 1
+    bp.write(db, "export_stats", {"total": (stats.get("total", 0) + 1), "by_month": by_month})
     filename = f"{(project.data or {}).get('site_name') or project.name}_proposal.pptx".replace(" ", "_")
     return Response(
         content=pptx_bytes,

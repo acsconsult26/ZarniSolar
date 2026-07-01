@@ -174,6 +174,36 @@ def apply_text_replacements(prs):
             print(f"  ! substring not found: slide {slide_idx} / {shape_name} / {old!r}")
 
 
+def _set_para_first_run(shape, para_idx, token, clear_rest=True):
+    """Set paragraph[para_idx]'s first run to `token`, clearing its other runs."""
+    if shape is None or not shape.has_text_frame:
+        return
+    paras = shape.text_frame.paragraphs
+    if para_idx >= len(paras):
+        return
+    runs = paras[para_idx].runs
+    if not runs:
+        return
+    runs[0].text = token
+    if clear_rest:
+        for r in runs[1:]:
+            r.text = ""
+
+
+def tokenize_company_slide(prs):
+    """Slide 2 (company / branches) - admin-editable company info."""
+    slide = prs.slides[1]
+    _set_para_first_run(find_shape(slide.shapes, "TextBox 5"), 0, "{{company_name}}")
+    sub = find_shape(slide.shapes, "Subtitle 6")
+    _set_para_first_run(sub, 0, "{{branch1_address}}")
+    _set_para_first_run(sub, 1, "Ph: {{branch1_phone}}")
+    _set_para_first_run(sub, 2, "{{website}}")
+    rect = find_shape(slide.shapes, "Rectangle 9")
+    _set_para_first_run(rect, 0, "{{branch2_address}}")
+    _set_para_first_run(rect, 1, "Ph: {{branch2_phone}}")
+    _set_para_first_run(rect, 2, "{{website}}")
+
+
 def main():
     if not SRC.exists():
         print(f"Source template not found at {SRC}", file=sys.stderr)
@@ -181,6 +211,7 @@ def main():
     prs = Presentation(str(SRC))
     apply_text_replacements(prs)
     apply_exact_run_replacements(prs)
+    tokenize_company_slide(prs)
     DST.parent.mkdir(parents=True, exist_ok=True)
     prs.save(str(DST))
     print(f"Wrote tokenized template to {DST}")
