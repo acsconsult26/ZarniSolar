@@ -47,6 +47,13 @@ VARIABLE_DEFAULTS = {
     "epc_precharge": True,
     "generator_dod_trigger_pct": 20,
     "priority_order": ["Solar", "Battery", "EPC", "Generator"],
+    # New inserted slides (2/3/4)
+    "project_objectives": "",       # slide 3 body
+    "survey_location_name": "",     # slide 4
+    "survey_lat": None,
+    "survey_lng": None,
+    "project_solution": "",         # slide 4 long text
+    "install_area_sqft": None,      # slide 4
     # Slide 18 free-text narrative (Burmese); blank = keep template default
     "power_management_text": "",
     # Slide 21 narrative (Burmese); auto-drafted then editable. Blank = keep template default
