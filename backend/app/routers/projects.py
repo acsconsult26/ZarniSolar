@@ -31,6 +31,7 @@ def _gather_selected_products(data: dict, db: Session) -> dict:
                 "unit_label": prod.unit_label,
                 "specs": prod.specs or [],
                 "warranty_line": prod.warranty_line,
+                "image_path": prod.image_path,
             }
     return selected
 
