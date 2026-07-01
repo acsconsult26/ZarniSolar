@@ -225,6 +225,10 @@ export default function App() {
 
   const section = SECTIONS[step];
 
+  if (view === "admin") {
+    return <Admin onEditClient={loadProject} onExit={() => setView("form")} />;
+  }
+
   return (
     <div className="app">
       <div className="brand-logo">
@@ -240,10 +244,6 @@ export default function App() {
         </button>
       </div>
 
-      {view === "admin" ? (
-        <Admin onEditClient={loadProject} />
-      ) : (
-      <>
       <header>
         <h1>Solar ESS Proposal Generator</h1>
         <input className="project-name" value={name} onChange={(e) => setName(e.target.value)} />
@@ -367,8 +367,6 @@ export default function App() {
           Next
         </button>
       </footer>
-      </>
-      )}
     </div>
   );
 }
