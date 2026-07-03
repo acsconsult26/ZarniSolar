@@ -162,8 +162,7 @@ footer button:disabled { opacity: 0.45; cursor: default; }
 .stat-value { font-size: 2rem; font-weight: 700; color: var(--navy); }
 .stat-label { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; }
 
-.widget-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-top: 1.25rem; }
-@media (max-width: 720px) { .widget-grid { grid-template-columns: 1fr; } }
+.widget-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; margin-top: 1.25rem; }
 .bar-row { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 0.7rem; }
 .bar-label { width: 100px; font-size: 0.82rem; font-weight: 600; color: var(--text); }
 .bar-track { flex: 1; height: 14px; background: var(--bg); border-radius: 99px; overflow: hidden; }
@@ -172,6 +171,7 @@ footer button:disabled { opacity: 0.45; cursor: default; }
 .col-chart { display: flex; align-items: flex-end; gap: 0.6rem; height: 140px; padding-top: 0.5rem; }
 .col-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
 .col-bar { width: 60%; min-height: 4px; background: var(--brand-blue); border-radius: 6px 6px 0 0; }
+.col-bar.gold { background: var(--brand-gold); }
 .col-label { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.35rem; }
 
 .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: start; }

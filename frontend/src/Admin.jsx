@@ -345,6 +345,18 @@ function DashboardTab({ onGoTo }) {
   const months = Object.keys(exportStats.by_month || {}).sort().slice(-6);
   const maxMonth = Math.max(1, ...months.map((m) => exportStats.by_month[m]));
 
+  // Clients created per month (from created_at)
+  const clientsByMonth = {};
+  projects.forEach((p) => {
+    const d = p.created_at || p.updated_at;
+    if (d) {
+      const m = new Date(d).toISOString().slice(0, 7);
+      clientsByMonth[m] = (clientsByMonth[m] || 0) + 1;
+    }
+  });
+  const clientMonths = Object.keys(clientsByMonth).sort().slice(-6);
+  const maxClientMonth = Math.max(1, ...clientMonths.map((m) => clientsByMonth[m]));
+
   return (
     <div>
       <div className="stat-grid">
@@ -371,7 +383,23 @@ function DashboardTab({ onGoTo }) {
         </div>
 
         <div className="admin-card">
-          <h3>Exports (last 6 months)</h3>
+          <h3>Clients by Month</h3>
+          {clientMonths.length === 0 ? (
+            <p className="hint">No clients yet.</p>
+          ) : (
+            <div className="col-chart">
+              {clientMonths.map((m) => (
+                <div key={m} className="col-item">
+                  <div className="col-bar gold" style={{ height: `${(clientsByMonth[m] / maxClientMonth) * 100}%` }} title={`${clientsByMonth[m]} clients`} />
+                  <span className="col-label">{m.slice(5)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="admin-card">
+          <h3>Exports by Month</h3>
           {months.length === 0 ? (
             <p className="hint">No exports yet.</p>
           ) : (

@@ -105,6 +105,16 @@ export default function App() {
     api.listProductsAll().then(setCatalog).catch(() => setCatalog([]));
   }, [view]);
 
+  // Debounced auto-save: persist name + data as the user types so the Clients
+  // tab always reflects the latest project name/details without a manual save.
+  useEffect(() => {
+    if (!projectId || view !== "form") return;
+    const t = setTimeout(() => {
+      api.updateProject(projectId, { name, data }).catch(() => {});
+    }, 700);
+    return () => clearTimeout(t);
+  }, [name, data, projectId, view]);
+
   function selectProduct(category, productId) {
     const idField = `${category}_product_id`;
     if (!productId) {
