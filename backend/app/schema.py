@@ -47,13 +47,38 @@ VARIABLE_DEFAULTS = {
     "epc_precharge": True,
     "generator_dod_trigger_pct": 20,
     "priority_order": ["Solar", "Battery", "EPC", "Generator"],
-    # New inserted slides (2/3/4)
-    "project_objectives": "",       # slide 3 body
-    "survey_location_name": "",     # slide 4
+    # --- Redesigned deck (v2) slides 1-12 ---
+    "introduction": "",             # slide 2 rich text (HTML)
+    "project_objectives": "",       # slide 4 rich text (HTML)
+    "survey_location_name": "",     # slide 5
     "survey_lat": None,
     "survey_lng": None,
-    "project_solution": "",         # slide 4 long text
-    "install_area_sqft": None,      # slide 4
+    "project_solution": "",         # slide 5 solution name
+    "install_area_sqft": None,      # slide 5 area (sq ft)
+    "tilt_angle": None,             # slide 5 tilt angle (deg)
+    # slide 6 - electricity bill
+    "total_epc_cost": None,         # MMK
+    "total_epc_units": None,        # units
+    # slide 9 - surveying data result
+    "duration_hours": None,
+    "transformer_kva": None,
+    "pv_installation_area_sqft": None,
+    "survey_avg_units": None,       # from Excel analysis (confirmed)
+    "survey_peak_units": None,
+    # slide 10 - power analyzer
+    "analyzer_date_range": "",
+    # slide 11/12 - optional second survey
+    "include_second_survey": False,
+    "second_max_load_kw": None,
+    "second_duration_hours": None,
+    "second_voltage_v": None,
+    "second_transformer_kva": None,
+    "second_generator_kva": None,
+    "second_pv_area_sqft": None,
+    "second_power_factor": None,
+    "second_avg_units": None,
+    "second_peak_units": None,
+    "second_analyzer_date_range": "",
     # Slide 18 free-text narrative (Burmese); blank = keep template default
     "power_management_text": "",
     # Slide 21 narrative (Burmese); auto-drafted then editable. Blank = keep template default
@@ -86,6 +111,10 @@ def compute_auto_fields(data: dict) -> dict:
     avg_load = num("avg_load_kw")
     battery_autonomy_hours = (total_battery_kwh / avg_load) if avg_load else 0
 
+    # Slide 6: per-unit electricity cost = total cost / total units
+    epc_units = num("total_epc_units")
+    per_unit_cost = (num("total_epc_cost") / epc_units) if epc_units else 0
+
     def fmt(x):
         return int(x) if float(x).is_integer() else round(x, 2)
 
@@ -94,6 +123,7 @@ def compute_auto_fields(data: dict) -> dict:
         "total_battery_kwh": fmt(total_battery_kwh),
         "total_solar_kwp": fmt(total_solar_kwp),
         "battery_autonomy_hours": fmt(round(battery_autonomy_hours, 1)),
+        "per_unit_cost": round(per_unit_cost, 2),
     }
 
 

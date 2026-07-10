@@ -481,6 +481,7 @@ function SettingsTab({ token }) {
       <div className="admin-card">
         <h3>Company Info (Slide 2)</h3>
         <label><span>Company name</span><input value={company.company_name || ""} onChange={(e) => setCompany({ ...company, company_name: e.target.value })} /></label>
+        <label><span>Contact number (Slide 1)</span><input value={company.contact || ""} onChange={(e) => setCompany({ ...company, contact: e.target.value })} /></label>
         <label><span>Website</span><input value={company.website || ""} onChange={(e) => setCompany({ ...company, website: e.target.value })} /></label>
         {[0, 1].map((i) => (
           <div key={i} className="branch-block">

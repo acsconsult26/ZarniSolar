@@ -7,3 +7,4 @@ graphviz
 python-pptx
 Pillow
 psycopg2-binary
+openpyxl

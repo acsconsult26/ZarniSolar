@@ -100,6 +100,30 @@ header h1 { font-size: 1.25rem; color: var(--navy); margin: 0; font-weight: 700;
 .totals ul { margin: 0; padding-left: 1.1rem; line-height: 1.7; }
 .totals li { font-weight: 600; }
 .hint { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.5rem; }
+.section-note { font-size: 0.82rem; color: var(--text-muted); background: var(--bg); border-radius: 8px; padding: 0.5rem 0.75rem; margin-bottom: 1rem; }
+.per-unit { font-size: 1.4rem; font-weight: 700; color: var(--brand-blue); margin: 0.3rem 0; }
+.toggle-row { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem; font-size: 0.9rem; font-weight: 600; color: var(--text); }
+.toggle-row input { width: 18px; height: 18px; }
+
+/* rich text editor */
+.richtext { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.richtext-toolbar { display: flex; gap: 0.25rem; align-items: center; padding: 0.4rem; background: var(--bg); border-bottom: 1px solid var(--border); }
+.richtext-toolbar button { min-width: 32px; padding: 0.3rem 0.55rem; border: 1px solid var(--border); background: #fff; border-radius: 6px; cursor: pointer; font-size: 0.82rem; }
+.richtext-toolbar button:hover { border-color: var(--brand-blue); color: var(--brand-blue); }
+.richtext-toolbar .sep { width: 1px; height: 20px; background: var(--border); margin: 0 0.3rem; }
+.richtext-area { min-height: 160px; padding: 0.7rem 0.85rem; font-size: 0.92rem; line-height: 1.5; outline: none; font-family: var(--mm), "Inter", sans-serif; }
+.richtext-area:empty::before { content: attr(data-placeholder); color: var(--text-muted); }
+.richtext-area ul, .richtext-area ol { margin: 0.3rem 0 0.3rem 1.3rem; }
+
+/* excel analyze */
+.excel-analyze { margin-top: 1.25rem; border: 1px dashed var(--border); border-radius: 12px; padding: 1rem 1.1rem; background: #fcfdff; }
+.excel-analyze h3 { margin-top: 0; color: var(--brand-blue); }
+.processing { color: var(--brand-blue); font-weight: 600; font-size: 0.88rem; }
+.excel-result { margin-top: 0.7rem; }
+.excel-figs { display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; font-size: 0.95rem; margin-bottom: 0.6rem; }
+.excel-figs .muted { color: var(--text-muted); font-size: 0.8rem; }
+.confirm-btn { padding: 0.5rem 1rem; border-radius: 8px; border: none; background: #1c7a3d; color: #fff; cursor: pointer; font-weight: 600; }
+.excel-confirmed { margin-top: 0.6rem; font-size: 0.85rem; color: #1c7a3d; font-weight: 600; }
 
 .slide19, .slide20 { margin-top: 1.75rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
 .slide19-preview, .flowchart-preview { max-width: 100%; border: 1px solid var(--border); border-radius: 12px; margin: 0.6rem 0; }

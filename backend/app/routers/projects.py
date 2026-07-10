@@ -6,6 +6,8 @@ from ..models import Project, Product
 from ..storage import storage
 from ..schema import merged_field_values
 from ..services.pptx_export import export_project
+from ..services.pptx_export_v2 import export_project_v2
+from ..services.excel_analysis import analyze_consumption
 from ..services import imagegen
 from ..services.flowchart import render_priority_flowchart
 from ..services.text_drafts import compose_power_priority_draft
@@ -138,6 +140,18 @@ def upload_slide19_fallback(project_id: int, file: UploadFile = File(...), db: S
     return {"url": storage.url_for(path)}
 
 
+@router.post("/{project_id}/analyze-consumption")
+def analyze_consumption_excel(project_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    project = db.query(Project).get(project_id)
+    if not project:
+        raise HTTPException(404, "Project not found")
+    try:
+        result = analyze_consumption(file.file.read())
+    except Exception as e:
+        raise HTTPException(400, f"Could not analyze the spreadsheet: {e}")
+    return result
+
+
 @router.get("/{project_id}/slide21/draft")
 def slide21_draft(project_id: int, db: Session = Depends(get_db)):
     project = db.query(Project).get(project_id)
@@ -162,15 +176,10 @@ def export(project_id: int, db: Session = Depends(get_db)):
     project = db.query(Project).get(project_id)
     if not project:
         raise HTTPException(404, "Project not found")
-    selected_products = _gather_selected_products(project.data or {}, db)
     company_info = bp.read(db, "company_info")
-    warranty_defaults = bp.read(db, "warranty_lines")
-    pptx_bytes = export_project(
-        project, storage,
-        selected_products=selected_products,
-        company_info=company_info,
-        warranty_defaults=warranty_defaults,
-    )
+    # Redesigned dark deck (v2), slides 1-12. The legacy template-based export
+    # remains in pptx_export.py for reference.
+    pptx_bytes = export_project_v2(project, storage, company_info=company_info)
     # track export stats (month bucket) for the dashboard
     import datetime as _dt
     stats = dict(bp.read(db, "export_stats") or {})

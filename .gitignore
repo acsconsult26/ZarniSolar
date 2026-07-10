@@ -10,3 +10,7 @@ frontend/dist/
 .DS_Store
 .claude/
 frontend/.vite/
+
+# reference decks / office lock files
+MRTV -Update file.pptx
+~$*.pptx

@@ -51,6 +51,12 @@ export const api = {
 
   slide21Draft: (id) => fetch(`${API_BASE}/projects/${id}/slide21/draft`).then(json),
 
+  analyzeConsumption: (id, file) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return fetch(`${API_BASE}/projects/${id}/analyze-consumption`, { method: "POST", body: fd }).then(json);
+  },
+
   previewFlowchartUrl: (id) => `${API_BASE}/projects/${id}/slide20/preview?t=${Date.now()}`,
 
   exportProject: async (id) => {

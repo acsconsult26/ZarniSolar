@@ -1,27 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "./api";
-import { SECTIONS, computeTotals } from "./fields";
+import { SECTIONS, perUnitCost } from "./fields";
+import RichText from "./RichText";
 import Admin from "./Admin";
 import "./App.css";
 
-function Field({ field, value, onChange, onDraft, drafting, catalog, onSelectProduct }) {
-  if (field.type === "product-select") {
-    const options = (catalog || []).filter((p) => p.category === field.category);
+function Field({ field, value, onChange }) {
+  if (field.type === "richtext") {
     return (
-      <label className="field">
-        <span className="field-label">{field.label}</span>
+      <label className="field field-wide">
+        <span className="field-label">{field.label}{field.required ? " *" : ""}</span>
         {field.help && <small className="field-help">{field.help}</small>}
-        <select
-          value={value ?? ""}
-          onChange={(e) => onSelectProduct(field.category, e.target.value)}
-        >
-          <option value="">— ကိုယ်တိုင် ဖြည့်ရန် / မရွေးပါ —</option>
-          {options.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.brand} {p.model_name} {p.unit_value ? `(${p.unit_value} ${p.unit_label || ""})` : ""}
-            </option>
-          ))}
-        </select>
+        <RichText value={value} onChange={(html) => onChange(field.name, html)} placeholder={field.help} />
       </label>
     );
   }
@@ -30,17 +20,7 @@ function Field({ field, value, onChange, onDraft, drafting, catalog, onSelectPro
       <label className="field field-wide">
         <span className="field-label">{field.label}{field.required ? " *" : ""}</span>
         {field.help && <small className="field-help">{field.help}</small>}
-        <textarea
-          rows={8}
-          value={value ?? ""}
-          lang={field.lang === "mm" ? "my" : undefined}
-          onChange={(e) => onChange(field.name, e.target.value)}
-        />
-        {field.draft && (
-          <button type="button" className="draft-btn" onClick={() => onDraft(field)} disabled={drafting}>
-            {drafting ? "Draft ထုတ်နေသည်…" : "Draft ထုတ်ရန်"}
-          </button>
-        )}
+        <textarea rows={6} value={value ?? ""} onChange={(e) => onChange(field.name, e.target.value)} />
       </label>
     );
   }
@@ -48,12 +28,7 @@ function Field({ field, value, onChange, onDraft, drafting, catalog, onSelectPro
     <label className="field">
       <span className="field-label">{field.label}{field.required ? " *" : ""}</span>
       {field.help && <small className="field-help">{field.help}</small>}
-      <input
-        type={field.type}
-        value={value ?? ""}
-        lang={field.lang === "mm" ? "my" : undefined}
-        onChange={(e) => onChange(field.name, e.target.value)}
-      />
+      <input type={field.type} value={value ?? ""} onChange={(e) => onChange(field.name, e.target.value)} />
     </label>
   );
 }
@@ -84,6 +59,60 @@ function ImageUpload({ image, projectId, onUploaded, currentUrl }) {
   );
 }
 
+function ExcelAnalyze({ config, projectId, data, setField }) {
+  const [status, setStatus] = useState(null); // null | 'processing' | 'done' | 'error'
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+
+  const avg = data[config.avgField];
+  const peak = data[config.peakField];
+
+  async function handleFile(e) {
+    const file = e.target.files[0];
+    if (!file || !projectId) return;
+    setStatus("processing");
+    setError(null);
+    setResult(null);
+    try {
+      const r = await api.analyzeConsumption(projectId, file);
+      setResult(r);
+      setStatus("done");
+    } catch (err) {
+      setError(String(err));
+      setStatus("error");
+    }
+  }
+
+  function confirm() {
+    if (!result) return;
+    setField(config.avgField, result.average_units);
+    setField(config.peakField, result.peak_units);
+  }
+
+  return (
+    <div className="excel-analyze">
+      <h3>Consumption Excel (hourly units)</h3>
+      <p className="hint">Upload an Excel file of hourly consumption. It is analyzed for average &amp; peak units. Review, then confirm to include in the slide.</p>
+      <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} />
+      {status === "processing" && <p className="processing">Processing calculation…</p>}
+      {status === "error" && <p className="error">{error}</p>}
+      {status === "done" && result && (
+        <div className="excel-result">
+          <div className="excel-figs">
+            <span><strong>Average:</strong> {result.average_units} units</span>
+            <span><strong>Peak:</strong> {result.peak_units} units</span>
+            <span className="muted">({result.sample_count} rows{result.column ? `, "${result.column}"` : ""})</span>
+          </div>
+          <button type="button" className="confirm-btn" onClick={confirm}>✓ Correct — use these values</button>
+        </div>
+      )}
+      {(avg != null && avg !== "") && (
+        <p className="excel-confirmed">In slide → Average {avg} units · Peak {peak} units</p>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [projectId, setProjectId] = useState(null);
   const [name, setName] = useState("Untitled Project");
@@ -91,52 +120,23 @@ export default function App() {
   const [uploads, setUploads] = useState({});
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
-  const [slide19Url, setSlide19Url] = useState(null);
-  const [genBusy, setGenBusy] = useState(false);
-  const [genError, setGenError] = useState(null);
-  const [flowchartKey, setFlowchartKey] = useState(0);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportError, setExportError] = useState(null);
-  const [drafting, setDrafting] = useState(false);
-  const [view, setView] = useState("form"); // "form" | "admin"
-  const [catalog, setCatalog] = useState([]);
+  const [view, setView] = useState("form");
 
   useEffect(() => {
-    api.listProductsAll().then(setCatalog).catch(() => setCatalog([]));
-  }, [view]);
+    api.createProject({ name: "Untitled Project", data: {} }).then((p) => setProjectId(p.id));
+  }, []);
 
-  // Debounced auto-save: persist name + data as the user types so the Clients
-  // tab always reflects the latest project name/details without a manual save.
+  // Debounced auto-save
   useEffect(() => {
     if (!projectId || view !== "form") return;
-    const t = setTimeout(() => {
-      api.updateProject(projectId, { name, data }).catch(() => {});
-    }, 700);
+    const t = setTimeout(() => api.updateProject(projectId, { name, data }).catch(() => {}), 700);
     return () => clearTimeout(t);
   }, [name, data, projectId, view]);
 
-  function selectProduct(category, productId) {
-    const idField = `${category}_product_id`;
-    if (!productId) {
-      setData((d) => ({ ...d, [idField]: "" }));
-      return;
-    }
-    const p = catalog.find((x) => String(x.id) === String(productId));
-    setData((d) => {
-      const next = { ...d, [idField]: Number(productId) };
-      if (!p) return next;
-      if (category === "inverter") {
-        next.inverter_model = `${p.brand} ${p.model_name}`.trim();
-        if (p.unit_value) next.inverter_unit_kw = p.unit_value;
-      } else if (category === "battery") {
-        next.battery_module = `${p.brand} ${p.model_name}`.trim();
-        if (p.unit_value) next.battery_unit_kwh = p.unit_value;
-      } else if (category === "panel") {
-        next.panel_brand = p.brand;
-        if (p.unit_value) next.panel_watt = p.unit_value;
-      }
-      return next;
-    });
+  function setField(fieldName, value) {
+    setData((d) => ({ ...d, [fieldName]: value }));
   }
 
   async function loadProject(id) {
@@ -145,7 +145,6 @@ export default function App() {
     setName(p.name);
     setData(p.data || {});
     setUploads(p.uploads || {});
-    setSlide19Url(p.slide19_image_url ? api.fileUrl(p.slide19_image_url) : null);
     setStep(0);
     setView("form");
   }
@@ -156,34 +155,8 @@ export default function App() {
     setName("Untitled Project");
     setData({});
     setUploads({});
-    setSlide19Url(null);
     setStep(0);
     setView("form");
-  }
-
-  async function handleDraft(field) {
-    if (!projectId || field.draft !== "slide21") return;
-    setDrafting(true);
-    try {
-      await api.updateProject(projectId, { name, data }); // ensure latest data on server
-      const result = await api.slide21Draft(projectId);
-      setField(field.name, result.text);
-    } catch (e) {
-      // non-fatal: leave the field as-is
-      console.error(e);
-    } finally {
-      setDrafting(false);
-    }
-  }
-
-  const totals = useMemo(() => computeTotals(data), [data]);
-
-  useEffect(() => {
-    api.createProject({ name: "Untitled Project", data: {} }).then((project) => setProjectId(project.id));
-  }, []);
-
-  function setField(fieldName, value) {
-    setData((d) => ({ ...d, [fieldName]: value }));
   }
 
   async function saveDraft() {
@@ -194,29 +167,6 @@ export default function App() {
     } finally {
       setSaving(false);
     }
-  }
-
-  async function generateSlide19() {
-    if (!projectId) return;
-    setGenBusy(true);
-    setGenError(null);
-    try {
-      await saveDraft();
-      const result = await api.generateSlide19(projectId);
-      setSlide19Url(api.fileUrl(result.url));
-    } catch (e) {
-      setGenError(String(e));
-    } finally {
-      setGenBusy(false);
-    }
-  }
-
-  async function uploadSlide19Manual(e) {
-    const file = e.target.files[0];
-    if (!file || !projectId) return;
-    const result = await api.uploadSlide19Fallback(projectId, file);
-    setSlide19Url(api.fileUrl(result.url));
-    setGenError(null);
   }
 
   async function handleExport() {
@@ -233,11 +183,12 @@ export default function App() {
     }
   }
 
-  const section = SECTIONS[step];
-
   if (view === "admin") {
     return <Admin onEditClient={loadProject} onExit={() => setView("form")} />;
   }
+
+  const section = SECTIONS[step];
+  const sectionEnabled = !section?.optionalToggle || !!data[section.optionalToggle];
 
   return (
     <div className="app">
@@ -246,16 +197,12 @@ export default function App() {
       </div>
 
       <div className="topnav">
-        <button className={view === "form" ? "active" : ""} onClick={() => setView("form")}>
-          Proposal Form
-        </button>
-        <button className={view === "admin" ? "active" : ""} onClick={() => setView("admin")}>
-          Admin
-        </button>
+        <button className={view === "form" ? "active" : ""} onClick={() => setView("form")}>Proposal Form</button>
+        <button className={view === "admin" ? "active" : ""} onClick={() => setView("admin")}>Admin</button>
       </div>
 
       <header>
-        <h1>Solar ESS Proposal Generator</h1>
+        <h1>Zarni Solar — Proposal</h1>
         <input className="project-name" value={name} onChange={(e) => setName(e.target.value)} />
         {projectId && <span className="project-id">Project #{projectId}</span>}
         <button className="new-project-btn" onClick={newProject}>+ New</button>
@@ -268,7 +215,7 @@ export default function App() {
           </button>
         ))}
         <button className={step === SECTIONS.length ? "active" : ""} onClick={() => setStep(SECTIONS.length)}>
-          Review & Export
+          Review &amp; Export
         </button>
       </nav>
 
@@ -276,90 +223,66 @@ export default function App() {
         {step < SECTIONS.length && (
           <section className="form-section">
             <h2>{section.title}</h2>
-            <div className="field-grid">
-              {section.fields.map((f) => (
-                <Field key={f.name} field={f} value={data[f.name]} onChange={setField} onDraft={handleDraft} drafting={drafting} catalog={catalog} onSelectProduct={selectProduct} />
-              ))}
-            </div>
-            {section.images && (
-              <>
-                <h3>Photos</h3>
-                <div className="image-grid">
-                  {section.images.map((img) => (
-                    <ImageUpload
-                      key={img.name}
-                      image={img}
-                      projectId={projectId}
-                      currentUrl={api.fileUrl(uploads[img.name])}
-                      onUploaded={(fieldName, url) => setUploads((u) => ({ ...u, [fieldName]: url }))}
-                    />
-                  ))}
-                </div>
-              </>
+            {section.note && <p className="section-note">{section.note}</p>}
+
+            {section.optionalToggle && (
+              <label className="toggle-row">
+                <input
+                  type="checkbox"
+                  checked={!!data[section.optionalToggle]}
+                  onChange={(e) => setField(section.optionalToggle, e.target.checked)}
+                />
+                <span>Include these slides (only if the client has other metered buildings)</span>
+              </label>
             )}
 
-            {section.key === "system" && (
-              <div className="totals">
-                <h3>Live Totals (AUTO)</h3>
-                <ul>
-                  <li>Total Inverter: {totals.total_inverter_kw} kW</li>
-                  <li>Total Battery: {totals.total_battery_kwh} kWh</li>
-                  <li>Total Solar: {totals.total_solar_kwp} kWp</li>
-                </ul>
-                <p className="hint">
-                  These AUTO totals drive slides 8, 17, 18, 19, 21 consistently &mdash; no more mismatched capacity
-                  numbers across the deck.
-                </p>
-              </div>
+            {sectionEnabled && (
+              <>
+                <div className="field-grid">
+                  {section.fields.map((f) => (
+                    <Field key={f.name} field={f} value={data[f.name]} onChange={setField} />
+                  ))}
+                </div>
+
+                {section.perUnit && (
+                  <div className="totals">
+                    <h3>Per-Unit Cost (AUTO)</h3>
+                    <p className="per-unit">{perUnitCost(data).toLocaleString()} MMK / unit</p>
+                    <p className="hint">= Total EPC Cost ÷ Total EPC Units. Shown on slide 6.</p>
+                  </div>
+                )}
+
+                {section.excelAnalyze && (
+                  <ExcelAnalyze config={section.excelAnalyze} projectId={projectId} data={data} setField={setField} />
+                )}
+
+                {section.images && (
+                  <>
+                    <h3>Photos</h3>
+                    <div className="image-grid">
+                      {section.images.map((img) => (
+                        <ImageUpload
+                          key={img.name}
+                          image={img}
+                          projectId={projectId}
+                          currentUrl={api.fileUrl(uploads[img.name])}
+                          onUploaded={(fieldName, url) => setUploads((u) => ({ ...u, [fieldName]: url }))}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
             )}
           </section>
         )}
 
         {step === SECTIONS.length && (
           <section className="form-section">
-            <h2>Review & Export</h2>
-
-            <div className="totals">
-              <h3>Computed Totals</h3>
-              <ul>
-                <li>Total Inverter: {totals.total_inverter_kw} kW</li>
-                <li>Total Battery: {totals.total_battery_kwh} kWh</li>
-                <li>Total Solar: {totals.total_solar_kwp} kWp</li>
-              </ul>
-            </div>
-
-            <div className="slide19">
-              <h3>Slide 19 &mdash; AI-Generated Infographic</h3>
-              {slide19Url && <img className="slide19-preview" src={slide19Url} alt="Slide 19 infographic" />}
-              <div className="slide19-actions">
-                <button onClick={generateSlide19} disabled={genBusy}>
-                  {genBusy ? "Generating..." : slide19Url ? "Regenerate" : "Generate"}
-                </button>
-                <label className="upload-fallback">
-                  or upload manually
-                  <input type="file" accept="image/*" onChange={uploadSlide19Manual} />
-                </label>
-              </div>
-              {genError && <p className="error">{genError}</p>}
-            </div>
-
-            <div className="slide20">
-              <h3>Slide 20 &mdash; Power Source Priority Flowchart (auto-drawn)</h3>
-              {projectId && (
-                <img
-                  key={flowchartKey}
-                  className="flowchart-preview"
-                  src={api.previewFlowchartUrl(projectId)}
-                  alt="Priority flowchart"
-                />
-              )}
-              <button onClick={() => setFlowchartKey((k) => k + 1)}>Refresh preview</button>
-            </div>
-
+            <h2>Review &amp; Export</h2>
+            <p className="hint">The proposal deck is generated as a dark-themed PowerPoint (slides 1–12). More sections coming soon.</p>
             <div className="export-actions">
-              <button onClick={saveDraft} disabled={saving}>
-                {saving ? "Saving..." : "Save Draft"}
-              </button>
+              <button onClick={saveDraft} disabled={saving}>{saving ? "Saving..." : "Save Draft"}</button>
               <button className="primary" onClick={handleExport} disabled={exportBusy}>
                 {exportBusy ? "Exporting..." : "Export PPTX"}
               </button>
@@ -370,12 +293,8 @@ export default function App() {
       </main>
 
       <footer>
-        <button disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))}>
-          Back
-        </button>
-        <button disabled={step === SECTIONS.length} onClick={() => setStep((s) => Math.min(SECTIONS.length, s + 1))}>
-          Next
-        </button>
+        <button disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))}>Back</button>
+        <button disabled={step === SECTIONS.length} onClick={() => setStep((s) => Math.min(SECTIONS.length, s + 1))}>Next</button>
       </footer>
     </div>
   );

@@ -14,7 +14,8 @@ BOILERPLATE_DEFAULTS = {
             {"address": "No. 357/359, Thein Phyu Road, Mingalar Taung Nyunt Tsp, Yangon", "phone": "09-9773033440"},
         ],
         "website": "http://www.zarnielect.com",
-        "company_name": "ZARNI AUNG & SONS TRADING Co.,Ltd",
+        "company_name": "ZARNI AUNG & SONS Co.,Ltd",
+        "contact": "09-2031977",
     },
     "warranty_lines": [
         "Sigenergy PV 60M1-HYB - 5 Years Full Warranty (Replacement)",
