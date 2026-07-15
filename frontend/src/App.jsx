@@ -113,6 +113,80 @@ function ExcelAnalyze({ config, projectId, data, setField }) {
   );
 }
 
+function SystemOptions({ data, setField }) {
+  const [catalog, setCatalog] = useState([]);
+  useEffect(() => { api.listProductsAll().then(setCatalog).catch(() => setCatalog([])); }, []);
+
+  const options = data.system_options || [];
+  const update = (next) => setField("system_options", next);
+
+  function addOption() {
+    if (options.length >= 4) return;
+    update([...options, { title: `Option ${options.length + 1}`, capex: "", items: [] }]);
+  }
+  function removeOption(i) { update(options.filter((_, idx) => idx !== i)); }
+  function setOption(i, patch) { update(options.map((o, idx) => (idx === i ? { ...o, ...patch } : o))); }
+
+  function addItem(i) {
+    const o = options[i];
+    setOption(i, { items: [...(o.items || []), { name: "", qty: 1, unit: "Nos" }] });
+  }
+  function setItem(i, j, patch) {
+    const o = options[i];
+    setOption(i, { items: o.items.map((it, idx) => (idx === j ? { ...it, ...patch } : it)) });
+  }
+  function removeItem(i, j) {
+    const o = options[i];
+    setOption(i, { items: o.items.filter((_, idx) => idx !== j) });
+  }
+  function pickProduct(i, j, productId) {
+    const p = catalog.find((x) => String(x.id) === String(productId));
+    if (!p) { setItem(i, j, { name: "" }); return; }
+    const rating = p.unit_value ? ` ${p.unit_value}${p.unit_label || ""}` : "";
+    setItem(i, j, { name: `${p.brand}${rating} ${p.model_name}`.replace(/\s+/g, " ").trim() });
+  }
+
+  return (
+    <div className="sysopts">
+      <div className="sysopts-grid">
+        {options.map((o, i) => (
+          <div key={i} className="option-card">
+            <div className="option-head">
+              <input className="option-title" value={o.title || ""} placeholder={`Option ${i + 1}`}
+                     onChange={(e) => setOption(i, { title: e.target.value })} />
+              <button className="remove-x" onClick={() => removeOption(i)}>×</button>
+            </div>
+            {(o.items || []).map((it, j) => (
+              <div key={j} className="option-item">
+                <select value="" onChange={(e) => { pickProduct(i, j, e.target.value); e.target.value = ""; }}>
+                  <option value="">{it.name ? "↺ change product" : "Pick product…"}</option>
+                  {catalog.map((p) => (
+                    <option key={p.id} value={p.id}>{p.brand} {p.model_name}</option>
+                  ))}
+                </select>
+                <input className="item-name" value={it.name || ""} placeholder="item name"
+                       onChange={(e) => setItem(i, j, { name: e.target.value })} />
+                <input className="item-qty" type="number" value={it.qty ?? ""} placeholder="qty"
+                       onChange={(e) => setItem(i, j, { qty: e.target.value })} />
+                <input className="item-unit" value={it.unit || ""} placeholder="unit"
+                       onChange={(e) => setItem(i, j, { unit: e.target.value })} />
+                <button className="remove-x" onClick={() => removeItem(i, j)}>×</button>
+              </div>
+            ))}
+            <button className="add-item-btn" onClick={() => addItem(i)}>+ Add item</button>
+            <label className="capex-field">
+              <span>Est. CAPEX (MMK)</span>
+              <input type="number" value={o.capex ?? ""} onChange={(e) => setOption(i, { capex: e.target.value })} />
+            </label>
+          </div>
+        ))}
+      </div>
+      {options.length < 4 && <button className="add-option-btn" onClick={addOption}>+ Add Option ({options.length}/4)</button>}
+      {catalog.length === 0 && <p className="hint">No catalog products yet — add products in Admin → Products first.</p>}
+    </div>
+  );
+}
+
 export default function App() {
   const [projectId, setProjectId] = useState(null);
   const [name, setName] = useState("Untitled Project");
@@ -236,7 +310,9 @@ export default function App() {
               </label>
             )}
 
-            {sectionEnabled && (
+            {section.systemOptions && <SystemOptions data={data} setField={setField} />}
+
+            {sectionEnabled && !section.systemOptions && (
               <>
                 <div className="field-grid">
                   {section.fields.map((f) => (

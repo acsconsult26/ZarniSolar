@@ -79,6 +79,9 @@ VARIABLE_DEFAULTS = {
     "second_avg_units": None,
     "second_peak_units": None,
     "second_analyzer_date_range": "",
+    # slides 13-14 - system requirement options (up to 4)
+    # [{title, capex, items:[{name, qty, unit}]}]
+    "system_options": [],
     # Slide 18 free-text narrative (Burmese); blank = keep template default
     "power_management_text": "",
     # Slide 21 narrative (Burmese); auto-drafted then editable. Blank = keep template default

@@ -34,6 +34,21 @@ BOILERPLATE_DEFAULTS = {
         "voltage_v": 230,
         "design_margin_pct": 20,
     },
+    # Product catalog categories (admin-manageable). key = stored value, label = display.
+    "product_categories": [
+        {"key": "panel", "label": "Solar Panel"},
+        {"key": "inverter", "label": "Inverter"},
+        {"key": "battery", "label": "Battery"},
+        {"key": "base_main", "label": "Base Main"},
+        {"key": "base_sub", "label": "Base SUB"},
+        {"key": "battery_controller", "label": "Battery Controller (BC)"},
+        {"key": "installation_kit", "label": "Installation Kit"},
+        {"key": "solar_support", "label": "Solar Support Structure"},
+        {"key": "switch", "label": "Switch"},
+        {"key": "main_breaker", "label": "Main / Breaker"},
+        {"key": "plug", "label": "Plug"},
+        {"key": "accessory", "label": "Other Accessory"},
+    ],
     # read-only stat, not user-editable in the UI
     "export_stats": {"total": 0, "by_month": {}},
 }

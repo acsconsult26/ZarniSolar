@@ -83,6 +83,16 @@ def export_project_v2(project, storage, company_info=None) -> bytes:
         _slide10_analyzer(prs, client, v.get("second_analyzer_date_range"),
                           imgs.get("second_analyzer_image"), company_name, page=12)
 
+    # Slides 13-14 : System Requirement options (up to 4, 2 per slide)
+    options = [o for o in (data.get("system_options") or [])
+               if (o.get("items") or o.get("capex"))]
+    if options:
+        page = len(prs.slides._sldIdLst) + 1
+        _slide_options(prs, "System Requirement", options[:2], page, company_name)
+    if len(options) > 2:
+        page = len(prs.slides._sldIdLst) + 1
+        _slide_options(prs, "System Requirement (cont.)", options[2:4], page, company_name)
+
     import io
     out = io.BytesIO()
     prs.save(out)
@@ -254,6 +264,54 @@ def _slide10_analyzer(prs, client, date_range, image, company_name, page):
                             prs.slide_height - top - Inches(0.9))
     else:
         _placeholder(slide, Inches(0.9), top, prs.slide_width - Inches(1.8), prs.slide_height - top - Inches(0.9))
+
+
+def _option_line(item):
+    name = (item.get("name") or "").strip()
+    qty = item.get("qty")
+    unit = (item.get("unit") or "Nos").strip()
+    if qty in (None, ""):
+        return name
+    return f"{name}  ({qty} {unit})"
+
+
+def _slide_options(prs, title, options, page, company_name):
+    slide = T.add_slide(prs, page=page, company_name=company_name)
+    top = T.add_title(slide, prs, title)
+    ncols = len(options)
+    max_items = max((len(o.get("items") or []) for o in options), default=0)
+    nrows = 1 + max_items + 1  # title header + item rows + CAPEX row
+
+    left = Inches(0.7)
+    width = prs.slide_width - Inches(1.4)
+    height = prs.slide_height - top - Inches(0.7)
+    gf = slide.shapes.add_table(nrows, ncols, left, top, int(width), int(height))
+    table = gf.table
+    table.first_row = False
+    table.horz_banding = False
+    col_w = int(width / ncols)
+    for c in range(ncols):
+        table.columns[c].width = col_w
+
+    def cell(r, c, text, *, size, bold, color, bg):
+        cl = table.cell(r, c)
+        cl.fill.solid(); cl.fill.fore_color.rgb = bg
+        cl.vertical_anchor = MSO_ANCHOR.MIDDLE
+        cl.margin_top = Pt(3); cl.margin_bottom = Pt(3)
+        tf = cl.text_frame; tf.word_wrap = True
+        tf.paragraphs[0].alignment = PP_ALIGN.CENTER
+        run = tf.paragraphs[0].add_run()
+        T._apply_run(run, text, size=size, bold=bold, italic=False, color=color, font=T.FONT)
+
+    for ci, opt in enumerate(options):
+        cell(0, ci, opt.get("title") or f"Option {ci + 1}", size=16, bold=True, color=T.WHITE, bg=T.ACCENT)
+        items = opt.get("items") or []
+        for ri in range(max_items):
+            txt = _option_line(items[ri]) if ri < len(items) else ""
+            cell(ri + 1, ci, txt, size=12, bold=False, color=T.WHITE, bg=T.PANEL)
+        capex = opt.get("capex")
+        capex_txt = f"Est. CAPEX = {_money(capex)} MMK" if capex not in (None, "") else "Est. CAPEX = —"
+        cell(nrows - 1, ci, capex_txt, size=14, bold=True, color=T.BG, bg=T.GOLD)
 
 
 def _placeholder(slide, left, top, w, h):

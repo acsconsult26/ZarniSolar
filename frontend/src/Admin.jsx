@@ -2,7 +2,15 @@ import { useEffect, useState } from "react";
 import { api } from "./api";
 
 const TOKEN_KEY = "zarni_admin_token";
-const CATEGORIES = ["panel", "inverter", "battery"];
+const FALLBACK_CATEGORIES = [
+  { key: "panel", label: "Solar Panel" },
+  { key: "inverter", label: "Inverter" },
+  { key: "battery", label: "Battery" },
+];
+
+function slugify(s) {
+  return (s || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
 
 function Login({ onLoggedIn }) {
   const [email, setEmail] = useState("admin@zarni.com");
@@ -94,9 +102,7 @@ function valuesToSpecs(category, values) {
     .filter((s) => s.value !== "");
 }
 
-const CATEGORY_LABELS = { panel: "Solar Panel", inverter: "Inverter", battery: "Battery" };
-
-function ProductModal({ token, initial, onClose, onSaved }) {
+function ProductModal({ token, initial, onClose, onSaved, categories }) {
   const [form, setForm] = useState(initial);
   const [specValues, setSpecValues] = useState(initial.specValues || {});
   const [error, setError] = useState(null);
@@ -133,6 +139,7 @@ function ProductModal({ token, initial, onClose, onSaved }) {
   }
 
   const specFields = SPEC_FIELDS[form.category] || [];
+  const labelOf = (key) => (categories.find((c) => c.key === key)?.label) || key;
 
   return (
     <div className="modal-overlay" onMouseDown={onClose}>
@@ -145,7 +152,7 @@ function ProductModal({ token, initial, onClose, onSaved }) {
           <div className="row">
             <label><span>Category</span>
               <select value={form.category} onChange={(e) => set("category", e.target.value)}>
-                {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+                {categories.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
               </select>
             </label>
             <label><span>Brand</span><input value={form.brand} onChange={(e) => set("brand", e.target.value)} /></label>
@@ -159,15 +166,17 @@ function ProductModal({ token, initial, onClose, onSaved }) {
             <input value={form.spec_title} onChange={(e) => set("spec_title", e.target.value)} placeholder="e.g. Sigen 60kW HYB Inverter" />
           </label>
 
-          <div className="spec-section">
-            <h4>{CATEGORY_LABELS[form.category]} Specifications</h4>
-            {specFields.map((f) => (
-              <label key={f.label} className="spec-field">
-                <span>{f.label}{f.unit ? ` (${f.unit})` : ""}</span>
-                <input value={specValues[f.label] ?? ""} onChange={(e) => setSpec(f.label, e.target.value)} />
-              </label>
-            ))}
-          </div>
+          {specFields.length > 0 && (
+            <div className="spec-section">
+              <h4>{labelOf(form.category)} Specifications</h4>
+              {specFields.map((f) => (
+                <label key={f.label} className="spec-field">
+                  <span>{f.label}{f.unit ? ` (${f.unit})` : ""}</span>
+                  <input value={specValues[f.label] ?? ""} onChange={(e) => setSpec(f.label, e.target.value)} />
+                </label>
+              ))}
+            </div>
+          )}
 
           <label><span>Warranty line</span><input value={form.warranty_line} onChange={(e) => set("warranty_line", e.target.value)} /></label>
           <label><span>Product image</span>
@@ -186,13 +195,45 @@ function ProductModal({ token, initial, onClose, onSaved }) {
 
 function ProductsTab({ token }) {
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState(FALLBACK_CATEGORIES);
   const [activeCat, setActiveCat] = useState("panel");
   const [modal, setModal] = useState(null); // null | initial-form-object
+  const [manageCats, setManageCats] = useState(false);
+  const [newCat, setNewCat] = useState("");
 
   async function refresh() { setProducts(await api.listProductsAll()); }
-  useEffect(() => { refresh(); }, []);
+  async function loadCats() {
+    try {
+      const c = await api.getBoilerplate("product_categories");
+      if (Array.isArray(c) && c.length) setCategories(c);
+    } catch { /* keep fallback */ }
+  }
+  useEffect(() => { refresh(); loadCats(); }, []);
 
-  function openAdd() { setModal({ ...EMPTY_PRODUCT, category: activeCat }); }
+  const labelOf = (key) => (categories.find((c) => c.key === key)?.label) || key;
+
+  async function addCategory() {
+    const label = newCat.trim();
+    const key = slugify(label);
+    if (!label || !key || categories.some((c) => c.key === key)) { setNewCat(""); return; }
+    const next = [...categories, { key, label }];
+    await api.putBoilerplate(token, "product_categories", next);
+    setCategories(next);
+    setNewCat("");
+  }
+  async function removeCategory(key) {
+    if (products.some((p) => p.category === key)) {
+      alert("Remove or reassign products in this category first.");
+      return;
+    }
+    if (!confirm("Remove this category?")) return;
+    const next = categories.filter((c) => c.key !== key);
+    await api.putBoilerplate(token, "product_categories", next);
+    setCategories(next);
+    if (activeCat === key) setActiveCat(next[0]?.key || "");
+  }
+
+  function openAdd() { setModal({ ...EMPTY_PRODUCT, category: activeCat || categories[0]?.key }); }
   function openEdit(p) {
     setModal({
       id: p.id,
@@ -219,14 +260,35 @@ function ProductsTab({ token }) {
     <div className="admin-card catalog-card">
       <div className="catalog-head">
         <div className="catalog-tabs">
-          {CATEGORIES.map((c) => (
-            <button key={c} className={activeCat === c ? "active" : ""} onClick={() => setActiveCat(c)}>
-              {CATEGORY_LABELS[c]} ({products.filter((p) => p.category === c).length})
+          {categories.map((c) => (
+            <button key={c.key} className={activeCat === c.key ? "active" : ""} onClick={() => setActiveCat(c.key)}>
+              {c.label} ({products.filter((p) => p.category === c.key).length})
             </button>
           ))}
         </div>
-        <button className="add-product-btn" onClick={openAdd}>+ Add Product</button>
+        <div className="catalog-actions">
+          <button className="ghost-btn" onClick={() => setManageCats((v) => !v)}>Manage Categories</button>
+          <button className="add-product-btn" onClick={openAdd}>+ Add Product</button>
+        </div>
       </div>
+
+      {manageCats && (
+        <div className="cat-manager">
+          <div className="cat-add">
+            <input value={newCat} placeholder="New category name (e.g. Switch)" onChange={(e) => setNewCat(e.target.value)}
+                   onKeyDown={(e) => e.key === "Enter" && addCategory()} />
+            <button onClick={addCategory}>Add</button>
+          </div>
+          <div className="cat-chips">
+            {categories.map((c) => (
+              <span key={c.key} className="cat-chip">
+                {c.label}
+                <button title="Remove" onClick={() => removeCategory(c.key)}>×</button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       <table className="catalog-table">
         <thead>
@@ -236,7 +298,7 @@ function ProductsTab({ token }) {
         </thead>
         <tbody>
           {rows.length === 0 && (
-            <tr><td colSpan={7} className="empty-row">No {CATEGORY_LABELS[activeCat]} products yet. Click “Add Product”.</td></tr>
+            <tr><td colSpan={7} className="empty-row">No {labelOf(activeCat)} products yet. Click “Add Product”.</td></tr>
           )}
           {rows.map((p) => (
             <tr key={p.id}>
@@ -259,6 +321,7 @@ function ProductsTab({ token }) {
         <ProductModal
           token={token}
           initial={modal}
+          categories={categories}
           onClose={() => setModal(null)}
           onSaved={() => { setModal(null); refresh(); }}
         />

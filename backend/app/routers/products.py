@@ -9,10 +9,14 @@ from ..db import get_db
 from ..models import Product
 from ..storage import storage
 from ..auth import require_admin
+from .. import boilerplate as bp
 
 router = APIRouter(prefix="/admin/products", tags=["products"])
 
-CATEGORIES = {"panel", "inverter", "battery"}
+
+def _allowed_categories(db: Session) -> set:
+    cats = bp.read(db, "product_categories") or []
+    return {c.get("key") for c in cats if c.get("key")}
 
 
 def _normalize_specs(specs):
@@ -61,9 +65,10 @@ def list_products(category: Optional[str] = None, db: Session = Depends(get_db))
 
 @router.post("", dependencies=[Depends(require_admin)])
 def create_product(body: dict, db: Session = Depends(get_db)):
-    category = (body.get("category") or "").lower()
-    if category not in CATEGORIES:
-        raise HTTPException(400, f"category must be one of {sorted(CATEGORIES)}")
+    category = (body.get("category") or "").strip()
+    allowed = _allowed_categories(db)
+    if category not in allowed:
+        raise HTTPException(400, f"Unknown category '{category}'. Add it in Admin first.")
     p = Product(
         category=category,
         brand=body.get("brand", ""),
@@ -90,7 +95,7 @@ def update_product(product_id: int, body: dict, db: Session = Depends(get_db)):
             setattr(p, field, body[field])
     if "specs" in body:
         p.specs = _normalize_specs(body["specs"])
-    if "category" in body and body["category"] in CATEGORIES:
+    if "category" in body and body["category"] in _allowed_categories(db):
         p.category = body["category"]
     db.commit()
     db.refresh(p)

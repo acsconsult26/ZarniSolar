@@ -105,6 +105,13 @@ export const SECTIONS = [
     images: [{ name: "second_analyzer_image", label: "Power Analyzer Image (Slide 12)" }],
     excelAnalyze: { avgField: "second_avg_units", peakField: "second_peak_units" },
   },
+  {
+    key: "options",
+    title: "System Options (Slides 13-14)",
+    systemOptions: true,
+    fields: [],
+    note: "Build up to 4 pricing options from catalog products. Options 1-2 go on slide 13, options 3-4 on slide 14.",
+  },
 ];
 
 export function perUnitCost(data) {
