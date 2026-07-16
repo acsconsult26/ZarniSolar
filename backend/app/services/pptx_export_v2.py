@@ -93,6 +93,11 @@ def export_project_v2(project, storage, company_info=None) -> bytes:
         page = len(prs.slides._sldIdLst) + 1
         _slide_options(prs, "System Requirement (cont.)", options[2:4], page, company_name)
 
+    # Slide 15 : ROI (EPC-only vs Solar) - only if the ROI inputs are present
+    if data.get("roi_total_epc_units") and data.get("roi_avg_unit_cost"):
+        page = len(prs.slides._sldIdLst) + 1
+        _slide_roi(prs, v, company_name, page)
+
     import io
     out = io.BytesIO()
     prs.save(out)
@@ -312,6 +317,102 @@ def _slide_options(prs, title, options, page, company_name):
         capex = opt.get("capex")
         capex_txt = f"Est. CAPEX = {_money(capex)} MMK" if capex not in (None, "") else "Est. CAPEX = —"
         cell(nrows - 1, ci, capex_txt, size=14, bold=True, color=T.BG, bg=T.GOLD)
+
+
+def _num(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _slide_roi(prs, v, company_name, page):
+    import math
+
+    n1 = _num(v.get("roi_total_epc_units"))
+    n2 = _num(v.get("roi_epc_with_solar_units"))
+    n3 = _num(v.get("roi_solar_units"))
+    cost = _num(v.get("roi_avg_unit_cost"))
+    years = int(_num(v.get("roi_years")) or 5)
+
+    annual_epc = n1 * 30 * 12 * cost
+    annual_solar = n3 * 30 * 12 * cost
+    total_epc = annual_epc * years
+    total_solar = annual_solar * years
+    savings = total_epc - total_solar
+
+    def i(x):
+        return f"{x:,.0f}"
+
+    slide = T.add_slide(prs, page=page, company_name=company_name)
+    top = T.add_title(slide, prs, "ROI  –  ရင်းနှီးမြှုပ်နှံမှု ပြန်လည်ရရှိမှု တွက်ချက်မှု")
+
+    # summary / ratio line
+    ratio_txt = "—"
+    if n2 and n3:
+        g = math.gcd(int(n2), int(n3)) or 1
+        epc_pct = (n2 / n1 * 100) if n1 else 0
+        solar_pct = (n3 / n1 * 100) if n1 else 0
+        ratio_txt = (f"စုစုပေါင်း သုံးစွဲမှု = {i(n1)} ယူနစ်     |     "
+                     f"EPC : Solar = {int(n2 // g)} : {int(n3 // g)}  "
+                     f"({epc_pct:.0f}% : {solar_pct:.0f}%)")
+    T.add_text(slide, ratio_txt, Inches(0.9), top, prs.slide_width - Inches(1.8), Inches(0.5),
+               size=15, color=T.GOLD, italic=True)
+    tbl_top = top + Inches(0.65)
+
+    # 3 rows x 2 cols table
+    left = Inches(0.7)
+    width = prs.slide_width - Inches(1.4)
+    height = prs.slide_height - tbl_top - Inches(1.2)
+    gf = slide.shapes.add_table(3, 2, left, tbl_top, int(width), int(height))
+    table = gf.table
+    table.first_row = False
+    table.horz_banding = False
+    table.columns[0].width = int(width / 2)
+    table.columns[1].width = int(width / 2)
+
+    def mcell(r, c, lines, *, size, bold, color, bg):
+        cl = table.cell(r, c)
+        cl.fill.solid(); cl.fill.fore_color.rgb = bg
+        cl.vertical_anchor = MSO_ANCHOR.MIDDLE
+        cl.margin_left = Inches(0.15); cl.margin_right = Inches(0.15)
+        tf = cl.text_frame; tf.word_wrap = True
+        for k, ln in enumerate(lines):
+            p = tf.paragraphs[0] if k == 0 else tf.add_paragraph()
+            p.alignment = PP_ALIGN.CENTER
+            run = p.add_run()
+            T._apply_run(run, ln, size=size, bold=bold, italic=False, color=color, font=T.FONT)
+
+    mcell(0, 0, ["EPC ဖြင့်သာ သုံးစွဲပါက"], size=16, bold=True, color=T.WHITE, bg=T.ACCENT)
+    mcell(0, 1, ["Solar ဖြင့် သုံးစွဲပါက"], size=16, bold=True, color=T.WHITE, bg=T.ACCENT)
+
+    mcell(1, 0, [
+        "တစ်နှစ်စာ ကုန်ကျငွေ",
+        f"{i(n1)} ယူနစ် × ၃၀ ရက် × ၁၂ လ × {i(cost)} ကျပ်",
+        f"= {i(annual_epc)} ကျပ်",
+    ], size=13, bold=False, color=T.WHITE, bg=T.PANEL)
+    mcell(1, 1, [
+        "တစ်နှစ်စာ ကုန်ကျငွေ",
+        f"{i(n3)} ယူနစ် × ၃၀ ရက် × ၁၂ လ × {i(cost)} ကျပ်",
+        f"= {i(annual_solar)} ကျပ်",
+    ], size=13, bold=False, color=T.WHITE, bg=T.PANEL)
+
+    mcell(2, 0, [
+        f"{years} နှစ်စာ ကုန်ကျငွေ",
+        f"{i(annual_epc)} × {years}",
+        f"= {i(total_epc)} ကျပ်",
+    ], size=13, bold=True, color=T.GOLD, bg=T.PANEL)
+    mcell(2, 1, [
+        f"{years} နှစ်စာ ကုန်ကျငွေ",
+        f"{i(annual_solar)} × {years}",
+        f"= {i(total_solar)} ကျပ်",
+    ], size=13, bold=True, color=T.GOLD, bg=T.PANEL)
+
+    # savings conclusion
+    T.add_text(slide,
+               f"{years} နှစ်အတွင်း ချွေတာနိုင်မှု = {i(total_epc)} − {i(total_solar)} = {i(savings)} ကျပ်",
+               Inches(0.7), prs.slide_height - Inches(1.05), width, Inches(0.5),
+               size=15, bold=True, color=T.WHITE, align=PP_ALIGN.CENTER)
 
 
 def _placeholder(slide, left, top, w, h):

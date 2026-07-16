@@ -82,6 +82,12 @@ VARIABLE_DEFAULTS = {
     # slides 13-14 - system requirement options (up to 4)
     # [{title, capex, items:[{name, qty, unit}]}]
     "system_options": [],
+    # slide 15 - ROI (EPC vs Solar)
+    "roi_total_epc_units": None,        # total daily usage (units)
+    "roi_epc_with_solar_units": None,   # daily EPC units still used with solar
+    "roi_solar_units": None,            # daily solar units
+    "roi_avg_unit_cost": None,          # MMK per unit
+    "roi_years": 5,                     # 1-10
     # Slide 18 free-text narrative (Burmese); blank = keep template default
     "power_management_text": "",
     # Slide 21 narrative (Burmese); auto-drafted then editable. Blank = keep template default

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
-import { SECTIONS, perUnitCost } from "./fields";
+import { SECTIONS, perUnitCost, roiCompute } from "./fields";
 import RichText from "./RichText";
 import Admin from "./Admin";
 import "./App.css";
@@ -327,6 +327,22 @@ export default function App() {
                     <p className="hint">= Total EPC Cost ÷ Total EPC Units. Shown on slide 6.</p>
                   </div>
                 )}
+
+                {section.roiCalc && (() => {
+                  const r = roiCompute(data);
+                  const mmk = (n) => Math.round(n).toLocaleString();
+                  return (
+                    <div className="totals">
+                      <h3>ROI Calculation (live)</h3>
+                      <p className="hint">EPC : Solar = <strong>{r.ratio}</strong> ({r.epcPct}% : {r.solarPct}%)</p>
+                      <ul>
+                        <li>EPC-only — annual: {mmk(r.annualEpc)} MMK · {r.years} yr: <strong>{mmk(r.totalEpc)} MMK</strong></li>
+                        <li>Solar — annual: {mmk(r.annualSolar)} MMK · {r.years} yr: <strong>{mmk(r.totalSolar)} MMK</strong></li>
+                        <li>Savings over {r.years} yr: <strong>{mmk(r.savings)} MMK</strong></li>
+                      </ul>
+                    </div>
+                  );
+                })()}
 
                 {section.excelAnalyze && (
                   <ExcelAnalyze config={section.excelAnalyze} projectId={projectId} data={data} setField={setField} />

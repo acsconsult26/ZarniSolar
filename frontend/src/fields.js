@@ -112,7 +112,43 @@ export const SECTIONS = [
     fields: [],
     note: "Build up to 4 pricing options from catalog products. Options 1-2 go on slide 13, options 3-4 on slide 14.",
   },
+  {
+    key: "roi",
+    title: "ROI (Slide 15)",
+    roiCalc: true,
+    note: "Return-on-investment: compares EPC-only vs Solar cost over the chosen years. Slide 15 shows the step-by-step calculation in Burmese.",
+    fields: [
+      { name: "roi_total_epc_units", label: "Total EPC Usage (Units/day)", help: "ဖောက်သည်၏ စုစုပေါင်း နေ့စဉ် သုံးစွဲမှု။ ဥပမာ — 684", type: "number" },
+      { name: "roi_epc_with_solar_units", label: "EPC Usage when Solar in use (Units/day)", help: "Solar သုံးချိန် EPC မှ ဆက်သုံးသော ယူနစ်။ ဥပမာ — 156", type: "number" },
+      { name: "roi_solar_units", label: "Total Solar Usage (Units/day)", help: "Solar မှ ထုတ်ပေးသော ယူနစ်။ ဥပမာ — 528", type: "number" },
+      { name: "roi_avg_unit_cost", label: "Average Unit Cost (MMK)", help: "တစ်ယူနစ် ပျမ်းမျှ ဈေးနှုန်း။ ဥပမာ — 500", type: "number" },
+      { name: "roi_years", label: "Number of Years (1-10)", help: "တွက်ချက်မည့် နှစ်အရေအတွက်။ ဥပမာ — 7", type: "number" },
+    ],
+  },
 ];
+
+export function roiCompute(data) {
+  const num = (v) => Number(v) || 0;
+  const n1 = num(data.roi_total_epc_units);
+  const n2 = num(data.roi_epc_with_solar_units);
+  const n3 = num(data.roi_solar_units);
+  const cost = num(data.roi_avg_unit_cost);
+  const years = num(data.roi_years) || 5;
+  const annualEpc = n1 * 30 * 12 * cost;
+  const annualSolar = n3 * 30 * 12 * cost;
+  const totalEpc = annualEpc * years;
+  const totalSolar = annualSolar * years;
+  const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+  const g = n2 && n3 ? gcd(Math.round(n2), Math.round(n3)) || 1 : 1;
+  return {
+    years,
+    ratio: n2 && n3 ? `${Math.round(n2 / g)} : ${Math.round(n3 / g)}` : "—",
+    epcPct: n1 ? Math.round((n2 / n1) * 100) : 0,
+    solarPct: n1 ? Math.round((n3 / n1) * 100) : 0,
+    annualEpc, annualSolar, totalEpc, totalSolar,
+    savings: totalEpc - totalSolar,
+  };
+}
 
 export function perUnitCost(data) {
   const cost = Number(data.total_epc_cost) || 0;
