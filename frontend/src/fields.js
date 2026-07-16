@@ -174,6 +174,18 @@ export const SIMULATION_SECTION = {
 };
 SECTIONS.push(SIMULATION_SECTION);
 
+export const PRODUCT_SPEC_SECTION = {
+  key: "product_specs",
+  title: "Product Specifications (Slides 26-28)",
+  note: "Pick the exact catalog product used for this proposal. Its spec table + image show on slides 26 (Solar), 27 (Battery), 28 (Inverter). Leave blank to skip a slide.",
+  fields: [
+    { name: "panel_product_id", label: "Solar Panel (Slide 26)", type: "product-select", category: "panel" },
+    { name: "battery_product_id", label: "Battery (Slide 27)", type: "product-select", category: "battery" },
+    { name: "inverter_product_id", label: "Inverter (Slide 28)", type: "product-select", category: "inverter" },
+  ],
+};
+SECTIONS.push(PRODUCT_SPEC_SECTION);
+
 export function paybackRows(data) {
   const n = (v) => Number(v) || 0;
   const epcMonth = n(data.payback_epc_units_month);

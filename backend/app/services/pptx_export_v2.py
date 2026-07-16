@@ -52,7 +52,8 @@ class _Imgs:
         return None
 
 
-def export_project_v2(project, storage, company_info=None) -> bytes:
+def export_project_v2(project, storage, company_info=None, selected_products=None,
+                      closing_statement=None) -> bytes:
     data = project.data or {}
     v = merged_field_values(data)
     ci = company_info or {}
@@ -154,6 +155,21 @@ def export_project_v2(project, storage, company_info=None) -> bytes:
         page = len(prs.slides._sldIdLst) + 1
         title = "South View Shade Report" + (" (Perfect)" if data.get("south_shade_perfect") else "")
         _slide_photo_row(prs, title, south_imgs, company_name, page)
+
+    # Slide 25 : fixed FYI info about Zarni Electronics Service (admin-editable)
+    if closing_statement:
+        page = len(prs.slides._sldIdLst) + 1
+        _slide_closing_statement(prs, closing_statement, company_name, page)
+
+    # Slides 26-28 : selected product specifications (Solar, Battery, Inverter)
+    for category, title in (("panel", "Solar Panel Specification"),
+                            ("battery", "Battery Specification"),
+                            ("inverter", "Inverter Specification")):
+        product = (selected_products or {}).get(category)
+        if product:
+            page = len(prs.slides._sldIdLst) + 1
+            image = _product_image(storage, product)
+            _slide_product_spec(prs, title, product, image, company_name, page)
 
     import io
     out = io.BytesIO()
@@ -346,6 +362,64 @@ def _slide_photo_row(prs, title, images, company_name, page, labels=None):
         if labels:
             T.add_text(slide, labels[i], left, top + h + Inches(0.1), w, Inches(0.4),
                        size=12, italic=True, color=T.MUTED, align=PP_ALIGN.CENTER)
+
+
+def _slide_closing_statement(prs, text, company_name, page):
+    slide = T.add_slide(prs, page=page, company_name=company_name)
+    top = T.add_title(slide, prs, "Zarni Electronics Service")
+    blocks = parse_html(text)
+    T.add_richtext(slide, blocks, Inches(0.9), top, prs.slide_width - Inches(1.8),
+                   prs.slide_height - top - Inches(0.8), size=16)
+
+
+def _product_image(storage, product):
+    path = (product or {}).get("image_path")
+    if path and storage.exists(path):
+        return storage.read_bytes(path)
+    return None
+
+
+def _slide_product_spec(prs, title, product, image, company_name, page):
+    slide = T.add_slide(prs, page=page, company_name=company_name)
+    subtitle = product.get("spec_title") or f"{product.get('brand', '')} {product.get('model_name', '')}".strip()
+    top = T.add_title(slide, prs, title, subtitle=subtitle or None)
+
+    img_w = Inches(4.2)
+    tbl_left = Inches(0.6) + img_w + Inches(0.4)
+    tbl_width = prs.slide_width - tbl_left - Inches(0.6)
+    height = prs.slide_height - top - Inches(0.8)
+
+    if image:
+        T.add_image_contain(slide, image, Inches(0.6), top, img_w, height)
+    else:
+        _placeholder(slide, Inches(0.6), top, img_w, height)
+
+    specs = product.get("specs") or []
+    nrows = max(len(specs), 1)
+    gf = slide.shapes.add_table(nrows, 2, int(tbl_left), int(top), int(tbl_width), int(height))
+    table = gf.table
+    table.first_row = False
+    table.horz_banding = False
+    table.columns[0].width = int(tbl_width * 0.55)
+    table.columns[1].width = int(tbl_width * 0.45)
+
+    def cell(r, c, text, *, bold, color, bg):
+        cl = table.cell(r, c)
+        cl.fill.solid(); cl.fill.fore_color.rgb = bg
+        cl.vertical_anchor = MSO_ANCHOR.MIDDLE
+        cl.margin_left = Inches(0.1)
+        tf = cl.text_frame; tf.word_wrap = True
+        run = tf.paragraphs[0].add_run()
+        T._apply_run(run, text, size=13, bold=bold, italic=False, color=color, font=T.FONT)
+
+    if specs:
+        for i, s in enumerate(specs):
+            bg = T.PANEL if i % 2 == 0 else T.BG
+            cell(i, 0, s.get("label", ""), bold=True, color=T.ACCENT, bg=bg)
+            cell(i, 1, f"{s.get('value', '')} {s.get('unit', '')}".strip(), bold=False, color=T.WHITE, bg=bg)
+    else:
+        cell(0, 0, "No specifications added", bold=False, color=T.MUTED, bg=T.PANEL)
+        cell(0, 1, "", bold=False, color=T.WHITE, bg=T.PANEL)
 
 
 def _slide_single_image(prs, title, image, company_name, page):

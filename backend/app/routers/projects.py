@@ -176,9 +176,12 @@ def export(project_id: int, db: Session = Depends(get_db)):
     if not project:
         raise HTTPException(404, "Project not found")
     company_info = bp.read(db, "company_info")
-    # Redesigned dark deck (v2), slides 1-12. The legacy template-based export
-    # remains in pptx_export.py for reference.
-    pptx_bytes = export_project_v2(project, storage, company_info=company_info)
+    selected_products = _gather_selected_products(project.data or {}, db)
+    closing_statement = bp.read(db, "closing_statement")
+    pptx_bytes = export_project_v2(
+        project, storage, company_info=company_info,
+        selected_products=selected_products, closing_statement=closing_statement,
+    )
     # track export stats (month bucket) for the dashboard
     import datetime as _dt
     stats = dict(bp.read(db, "export_stats") or {})

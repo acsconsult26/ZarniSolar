@@ -5,7 +5,29 @@ import RichText from "./RichText";
 import Admin from "./Admin";
 import "./App.css";
 
+function ProductSelect({ field, value, onChange }) {
+  const [options, setOptions] = useState([]);
+  useEffect(() => {
+    api.listProductsAll().then((all) => setOptions(all.filter((p) => p.category === field.category))).catch(() => {});
+  }, [field.category]);
+  return (
+    <label className="field">
+      <span className="field-label">{field.label}</span>
+      {field.help && <small className="field-help">{field.help}</small>}
+      <select value={value ?? ""} onChange={(e) => onChange(field.name, e.target.value ? Number(e.target.value) : "")}>
+        <option value="">— none —</option>
+        {options.map((p) => (
+          <option key={p.id} value={p.id}>{p.brand} {p.model_name}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function Field({ field, value, onChange }) {
+  if (field.type === "product-select") {
+    return <ProductSelect field={field} value={value} onChange={onChange} />;
+  }
   if (field.type === "richtext") {
     return (
       <label className="field field-wide">

@@ -504,12 +504,14 @@ function SettingsTab({ token }) {
   const [company, setCompany] = useState(null);
   const [warranty, setWarranty] = useState("");
   const [prompt, setPrompt] = useState("");
+  const [closing, setClosing] = useState("");
   const [status, setStatus] = useState("");
 
   useEffect(() => {
     api.getBoilerplate("company_info").then(setCompany).catch(() => {});
     api.getBoilerplate("warranty_lines").then((l) => setWarranty((l || []).join("\n"))).catch(() => {});
     api.getBoilerplate("slide19_prompt_template").then((p) => setPrompt(typeof p === "string" ? p : "")).catch(() => {});
+    api.getBoilerplate("closing_statement").then((c) => setClosing(typeof c === "string" ? c : "")).catch(() => {});
   }, []);
 
   function setBranch(i, k, v) {
@@ -531,6 +533,10 @@ function SettingsTab({ token }) {
   async function savePrompt() {
     await api.putBoilerplate(token, "slide19_prompt_template", prompt);
     flash("Slide-19 AI prompt saved.");
+  }
+  async function saveClosing() {
+    await api.putBoilerplate(token, "closing_statement", closing);
+    flash("Zarni Electronics Service info saved — appears on slide 25.");
   }
   function flash(msg) { setStatus(msg); setTimeout(() => setStatus(""), 4000); }
 
@@ -568,6 +574,13 @@ function SettingsTab({ token }) {
         <p className="hint">Placeholders like {"{site_name}"}, {"{total_solar_kwp}"}, {"{panel_qty}"} are filled from the project.</p>
         <textarea rows={10} value={prompt} onChange={(e) => setPrompt(e.target.value)} />
         <div className="row"><button onClick={savePrompt}>Save Prompt</button></div>
+      </div>
+
+      <div className="admin-card">
+        <h3>Zarni Electronics Service Info (Slide 25)</h3>
+        <p className="hint">Fixed FYI text shown to every client. One line per point.</p>
+        <textarea rows={6} value={closing} onChange={(e) => setClosing(e.target.value)} />
+        <div className="row"><button onClick={saveClosing}>Save Service Info</button></div>
       </div>
 
       <div className="admin-card">
