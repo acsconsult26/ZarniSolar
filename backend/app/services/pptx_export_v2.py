@@ -98,6 +98,13 @@ def export_project_v2(project, storage, company_info=None) -> bytes:
         page = len(prs.slides._sldIdLst) + 1
         _slide_roi(prs, v, company_name, page)
 
+    # Slide 16 : daily power usage comparison chart (Load / Grid / Solar per option)
+    chart_opts = [o for o in options if (o.get("grid_units") not in (None, "")
+                                         or o.get("solar_units") not in (None, ""))]
+    if chart_opts:
+        page = len(prs.slides._sldIdLst) + 1
+        _slide_usage_chart(prs, data, chart_opts, company_name, page)
+
     import io
     out = io.BytesIO()
     prs.save(out)
@@ -413,6 +420,39 @@ def _slide_roi(prs, v, company_name, page):
                f"{years} နှစ်အတွင်း ချွေတာနိုင်မှု = {i(total_epc)} − {i(total_solar)} = {i(savings)} ကျပ်",
                Inches(0.7), prs.slide_height - Inches(1.05), width, Inches(0.5),
                size=15, bold=True, color=T.WHITE, align=PP_ALIGN.CENTER)
+
+
+def _slide_usage_chart(prs, data, chart_opts, company_name, page):
+    from .chart_usage import render_usage_chart
+
+    def n(x):
+        try:
+            return float(x)
+        except (TypeError, ValueError):
+            return 0.0
+
+    # baseline "Daily Usage Unit" group: Load = Grid = daily usage, Solar = 0
+    baseline = n(data.get("chart_daily_usage"))
+    if not baseline and chart_opts:
+        first = chart_opts[0]
+        baseline = n(first.get("grid_units")) + n(first.get("solar_units"))
+
+    groups = [{"label": "DAILY USAGE UNIT", "load": baseline, "grid": baseline, "solar": 0}]
+    for o in chart_opts:
+        grid = n(o.get("grid_units"))
+        solar = n(o.get("solar_units"))
+        groups.append({
+            "label": (o.get("title") or "Option").upper(),
+            "load": grid + solar,
+            "grid": grid,
+            "solar": solar,
+        })
+
+    slide = T.add_slide(prs, page=page, company_name=company_name)
+    top = T.add_title(slide, prs, "Daily Power Usage Comparison (Battery + EPC)")
+    png = render_usage_chart(groups)
+    T.add_image_contain(slide, png, Inches(0.5), top, prs.slide_width - Inches(1.0),
+                        prs.slide_height - top - Inches(0.7))
 
 
 def _placeholder(slide, left, top, w, h):

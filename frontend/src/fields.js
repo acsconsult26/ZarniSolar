@@ -110,7 +110,7 @@ export const SECTIONS = [
     title: "System Options (Slides 13-14)",
     systemOptions: true,
     fields: [],
-    note: "Build up to 4 pricing options from catalog products. Options 1-2 go on slide 13, options 3-4 on slide 14.",
+    note: "Build up to 4 pricing options from catalog products. Options 1-2 → slide 13, options 3-4 → slide 14. Grid/Solar units per option + baseline feed the Slide 16 comparison chart.",
   },
   {
     key: "roi",

@@ -88,6 +88,8 @@ VARIABLE_DEFAULTS = {
     "roi_solar_units": None,            # daily solar units
     "roi_avg_unit_cost": None,          # MMK per unit
     "roi_years": 5,                     # 1-10
+    # slide 16 - usage comparison chart baseline ("Daily Usage Unit" group)
+    "chart_daily_usage": None,
     # Slide 18 free-text narrative (Burmese); blank = keep template default
     "power_management_text": "",
     # Slide 21 narrative (Burmese); auto-drafted then editable. Blank = keep template default

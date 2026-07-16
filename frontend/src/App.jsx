@@ -178,11 +178,26 @@ function SystemOptions({ data, setField }) {
               <span>Est. CAPEX (MMK)</span>
               <input type="number" value={o.capex ?? ""} onChange={(e) => setOption(i, { capex: e.target.value })} />
             </label>
+            <div className="usage-fields">
+              <label className="capex-field">
+                <span>Grid units/day (chart)</span>
+                <input type="number" value={o.grid_units ?? ""} onChange={(e) => setOption(i, { grid_units: e.target.value })} />
+              </label>
+              <label className="capex-field">
+                <span>Solar units/day (chart)</span>
+                <input type="number" value={o.solar_units ?? ""} onChange={(e) => setOption(i, { solar_units: e.target.value })} />
+              </label>
+            </div>
           </div>
         ))}
       </div>
       {options.length < 4 && <button className="add-option-btn" onClick={addOption}>+ Add Option ({options.length}/4)</button>}
       {catalog.length === 0 && <p className="hint">No catalog products yet — add products in Admin → Products first.</p>}
+      <label className="baseline-field">
+        <span>Daily Usage Units (chart baseline — Slide 16)</span>
+        <input type="number" value={data.chart_daily_usage ?? ""} placeholder="e.g. 900"
+               onChange={(e) => setField("chart_daily_usage", e.target.value)} />
+      </label>
     </div>
   );
 }
