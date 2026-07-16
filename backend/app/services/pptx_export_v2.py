@@ -110,6 +110,18 @@ def export_project_v2(project, storage, company_info=None) -> bytes:
         page = len(prs.slides._sldIdLst) + 1
         _slide_payback(prs, data, options[:4], company_name, page)
 
+    # Slide 18 : Hybrid Solar System Drawing (image upload)
+    if imgs.get("system_drawing_image"):
+        page = len(prs.slides._sldIdLst) + 1
+        _slide_single_image(prs, "Hybrid Solar System Drawing", imgs.get("system_drawing_image"),
+                            company_name, page)
+
+    # Slide 19 : Solar System Block Diagram (image upload)
+    if imgs.get("block_diagram_image"):
+        page = len(prs.slides._sldIdLst) + 1
+        _slide_single_image(prs, "Solar System Block Diagram", imgs.get("block_diagram_image"),
+                            company_name, page)
+
     import io
     out = io.BytesIO()
     prs.save(out)
@@ -281,6 +293,16 @@ def _slide10_analyzer(prs, client, date_range, image, company_name, page):
                             prs.slide_height - top - Inches(0.9))
     else:
         _placeholder(slide, Inches(0.9), top, prs.slide_width - Inches(1.8), prs.slide_height - top - Inches(0.9))
+
+
+def _slide_single_image(prs, title, image, company_name, page):
+    slide = T.add_slide(prs, page=page, company_name=company_name)
+    top = T.add_title(slide, prs, title)
+    if image:
+        T.add_image_contain(slide, image, Inches(0.6), top, prs.slide_width - Inches(1.2),
+                            prs.slide_height - top - Inches(0.8))
+    else:
+        _placeholder(slide, Inches(0.6), top, prs.slide_width - Inches(1.2), prs.slide_height - top - Inches(0.8))
 
 
 def _option_line(item):

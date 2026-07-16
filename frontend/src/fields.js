@@ -140,6 +140,18 @@ export const PAYBACK_SECTION = {
 };
 SECTIONS.push(PAYBACK_SECTION);
 
+export const TECH_DRAWINGS_SECTION = {
+  key: "tech_drawings",
+  title: "Technical Drawings (Slides 18-19)",
+  fields: [],
+  images: [
+    { name: "system_drawing_image", label: "Hybrid Solar System Drawing (Slide 18)" },
+    { name: "block_diagram_image", label: "Solar System Block Diagram (Slide 19)" },
+  ],
+  note: "Upload the system drawing and block diagram images; each is placed full-slide with its own title.",
+};
+SECTIONS.push(TECH_DRAWINGS_SECTION);
+
 export function paybackRows(data) {
   const n = (v) => Number(v) || 0;
   const epcMonth = n(data.payback_epc_units_month);
