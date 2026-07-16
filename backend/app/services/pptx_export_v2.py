@@ -122,6 +122,39 @@ def export_project_v2(project, storage, company_info=None) -> bytes:
         _slide_single_image(prs, "Solar System Block Diagram", imgs.get("block_diagram_image"),
                             company_name, page)
 
+    # Slide 20 : Simulation Result (South View, West View, PV Array)
+    sim_imgs = [imgs.get("sim_south_view"), imgs.get("sim_west_view"), imgs.get("sim_pv_array")]
+    if any(sim_imgs):
+        page = len(prs.slides._sldIdLst) + 1
+        _slide_photo_row(prs, "Simulation Result", sim_imgs, company_name, page,
+                         labels=["South View", "West View", "PV Array"])
+
+    # Slide 21 : Energy Yield Report (2 photos side by side)
+    eyr_imgs = [imgs.get("energy_yield_1"), imgs.get("energy_yield_2")]
+    if any(eyr_imgs):
+        page = len(prs.slides._sldIdLst) + 1
+        _slide_photo_row(prs, "Energy Yield Report", eyr_imgs, company_name, page)
+
+    # Slide 22 : Monthly Production From Solar (single full-size image)
+    if imgs.get("monthly_production_image"):
+        page = len(prs.slides._sldIdLst) + 1
+        _slide_single_image(prs, "Monthly Production From Solar", imgs.get("monthly_production_image"),
+                            company_name, page)
+
+    # Slide 23 : West View Shade Report (Perfect?) - 2 photos
+    west_imgs = [imgs.get("west_shade_1"), imgs.get("west_shade_2")]
+    if any(west_imgs):
+        page = len(prs.slides._sldIdLst) + 1
+        title = "West View Shade Report" + (" (Perfect)" if data.get("west_shade_perfect") else "")
+        _slide_photo_row(prs, title, west_imgs, company_name, page)
+
+    # Slide 24 : South View Shade Report (Perfect?) - 2 photos
+    south_imgs = [imgs.get("south_shade_1"), imgs.get("south_shade_2")]
+    if any(south_imgs):
+        page = len(prs.slides._sldIdLst) + 1
+        title = "South View Shade Report" + (" (Perfect)" if data.get("south_shade_perfect") else "")
+        _slide_photo_row(prs, title, south_imgs, company_name, page)
+
     import io
     out = io.BytesIO()
     prs.save(out)
@@ -293,6 +326,26 @@ def _slide10_analyzer(prs, client, date_range, image, company_name, page):
                             prs.slide_height - top - Inches(0.9))
     else:
         _placeholder(slide, Inches(0.9), top, prs.slide_width - Inches(1.8), prs.slide_height - top - Inches(0.9))
+
+
+def _slide_photo_row(prs, title, images, company_name, page, labels=None):
+    """Render 2-3 images side by side, equal width, with optional captions."""
+    slide = T.add_slide(prs, page=page, company_name=company_name)
+    top = T.add_title(slide, prs, title)
+    n = len(images)
+    gap = Inches(0.45)
+    margin = Inches(0.7)
+    w = (prs.slide_width - margin * 2 - gap * (n - 1)) / n
+    h = prs.slide_height - top - (Inches(1.2) if labels else Inches(1.0))
+    for i, img in enumerate(images):
+        left = margin + i * (w + gap)
+        if img:
+            T.add_image_contain(slide, img, left, top, w, h)
+        else:
+            _placeholder(slide, left, top, w, h)
+        if labels:
+            T.add_text(slide, labels[i], left, top + h + Inches(0.1), w, Inches(0.4),
+                       size=12, italic=True, color=T.MUTED, align=PP_ALIGN.CENTER)
 
 
 def _slide_single_image(prs, title, image, company_name, page):

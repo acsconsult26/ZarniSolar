@@ -152,6 +152,28 @@ export const TECH_DRAWINGS_SECTION = {
 };
 SECTIONS.push(TECH_DRAWINGS_SECTION);
 
+export const SIMULATION_SECTION = {
+  key: "simulation",
+  title: "Simulation & Shade Reports (Slides 20-24)",
+  fields: [
+    { name: "west_shade_perfect", label: "West View Shade — Perfect Match (Slide 23)", type: "checkbox" },
+    { name: "south_shade_perfect", label: "South View Shade — Perfect Match (Slide 24)", type: "checkbox" },
+  ],
+  images: [
+    { name: "sim_south_view", label: "Simulation — South View (Slide 20)" },
+    { name: "sim_west_view", label: "Simulation — West View (Slide 20)" },
+    { name: "sim_pv_array", label: "Simulation — PV Array (Slide 20)" },
+    { name: "energy_yield_1", label: "Energy Yield Report — Photo 1 (Slide 21)" },
+    { name: "energy_yield_2", label: "Energy Yield Report — Photo 2 (Slide 21)" },
+    { name: "monthly_production_image", label: "Monthly Production From Solar (Slide 22)" },
+    { name: "west_shade_1", label: "West Shade — Photo 1 (Slide 23)" },
+    { name: "west_shade_2", label: "West Shade — Photo 2 (Slide 23)" },
+    { name: "south_shade_1", label: "South Shade — Photo 1 (Slide 24)" },
+    { name: "south_shade_2", label: "South Shade — Photo 2 (Slide 24)" },
+  ],
+};
+SECTIONS.push(SIMULATION_SECTION);
+
 export function paybackRows(data) {
   const n = (v) => Number(v) || 0;
   const epcMonth = n(data.payback_epc_units_month);

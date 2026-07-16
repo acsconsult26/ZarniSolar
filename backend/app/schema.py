@@ -93,6 +93,9 @@ VARIABLE_DEFAULTS = {
     # slide 17 - payback comparison table (globals; per-option values live in system_options)
     "payback_epc_units_month": None,   # total EPC units per month (same for all options)
     "payback_unit_cost": None,         # MMK per unit
+    # slides 23/24 - shade report "Perfect Match" checkboxes
+    "west_shade_perfect": False,
+    "south_shade_perfect": False,
     # Slide 18 free-text narrative (Burmese); blank = keep template default
     "power_management_text": "",
     # Slide 21 narrative (Burmese); auto-drafted then editable. Blank = keep template default

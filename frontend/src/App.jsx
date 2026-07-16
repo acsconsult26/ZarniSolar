@@ -15,6 +15,14 @@ function Field({ field, value, onChange }) {
       </label>
     );
   }
+  if (field.type === "checkbox") {
+    return (
+      <label className="field toggle-row">
+        <input type="checkbox" checked={!!value} onChange={(e) => onChange(field.name, e.target.checked)} />
+        <span className="field-label">{field.label}</span>
+      </label>
+    );
+  }
   if (field.type === "textarea") {
     return (
       <label className="field field-wide">
