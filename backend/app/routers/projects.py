@@ -5,7 +5,6 @@ from ..db import get_db
 from ..models import Project, Product
 from ..storage import storage
 from ..schema import merged_field_values
-from ..services.pptx_export import export_project
 from ..services.pptx_export_v2 import export_project_v2
 from ..services.excel_analysis import analyze_consumption
 from ..services import imagegen

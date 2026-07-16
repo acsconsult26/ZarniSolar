@@ -14,3 +14,15 @@ frontend/.vite/
 # reference decks / office lock files
 MRTV -Update file.pptx
 ~$*.pptx
+
+# Ignore all PowerPoint presentations
+*.ppt
+*.pptx
+
+# Ignore video, audio, and large design assets
+*.mp4
+*.mov
+*.png
+*.jpg
+*.zip
+
