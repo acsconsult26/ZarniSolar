@@ -277,6 +277,15 @@ footer button:disabled { opacity: 0.45; cursor: default; }
 .usage-fields .capex-field { flex: 1; }
 .baseline-field { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; font-weight: 600; margin-top: 1rem; max-width: 360px; }
 .baseline-field input { padding: 0.5rem 0.65rem; border: 1px solid var(--border); border-radius: 8px; font: inherit; }
+.spec-mini { margin-top: 0.6rem; font-size: 0.72rem; font-weight: 700; color: var(--brand-blue); text-transform: uppercase; letter-spacing: 0.03em; }
+
+.payback-preview { margin-top: 1.25rem; }
+.payback-preview h3 { color: var(--brand-blue); }
+.pb-scroll { overflow-x: auto; }
+.pb-table { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
+.pb-table th, .pb-table td { border: 1px solid var(--border); padding: 0.45rem 0.6rem; text-align: center; }
+.pb-table tr:first-child th { background: var(--brand-blue); color: #fff; font-weight: 700; }
+.pb-table td:first-child, .pb-table th:first-child { background: var(--navy); color: #fff; font-weight: 600; text-align: left; }
 
 .catalog-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
 .catalog-table th { text-align: left; padding: 0.7rem 0.6rem; border-bottom: 2px solid var(--border); color: var(--text-muted); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.04em; }

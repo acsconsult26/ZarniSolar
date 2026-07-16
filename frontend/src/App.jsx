@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
-import { SECTIONS, perUnitCost, roiCompute } from "./fields";
+import { SECTIONS, perUnitCost, roiCompute, paybackRows } from "./fields";
 import RichText from "./RichText";
 import Admin from "./Admin";
 import "./App.css";
@@ -188,6 +188,21 @@ function SystemOptions({ data, setField }) {
                 <input type="number" value={o.solar_units ?? ""} onChange={(e) => setOption(i, { solar_units: e.target.value })} />
               </label>
             </div>
+            <div className="spec-mini">Payback / spec (Slide 17)</div>
+            <div className="usage-fields">
+              <label className="capex-field"><span>Solar count</span>
+                <input type="number" value={o.solar_count ?? ""} onChange={(e) => setOption(i, { solar_count: e.target.value })} /></label>
+              <label className="capex-field"><span>Inverter (kW)</span>
+                <input type="number" value={o.inverter_power ?? ""} onChange={(e) => setOption(i, { inverter_power: e.target.value })} /></label>
+            </div>
+            <div className="usage-fields">
+              <label className="capex-field"><span>Battery (kWh)</span>
+                <input type="number" value={o.battery_capacity ?? ""} onChange={(e) => setOption(i, { battery_capacity: e.target.value })} /></label>
+              <label className="capex-field"><span>Backup (Hrs)</span>
+                <input type="number" value={o.backup_hours ?? ""} onChange={(e) => setOption(i, { backup_hours: e.target.value })} /></label>
+              <label className="capex-field"><span>Payback (Yrs)</span>
+                <input type="number" value={o.payback_years ?? ""} onChange={(e) => setOption(i, { payback_years: e.target.value })} /></label>
+            </div>
           </div>
         ))}
       </div>
@@ -355,6 +370,31 @@ export default function App() {
                         <li>Solar — annual: {mmk(r.annualSolar)} MMK · {r.years} yr: <strong>{mmk(r.totalSolar)} MMK</strong></li>
                         <li>Savings over {r.years} yr: <strong>{mmk(r.savings)} MMK</strong></li>
                       </ul>
+                    </div>
+                  );
+                })()}
+
+                {section.paybackTable && (() => {
+                  const pb = paybackRows(data);
+                  const mmk = (v) => Math.round(v).toLocaleString();
+                  if (pb.columns.length === 0) return <p className="hint">Add options in the System Options step first.</p>;
+                  return (
+                    <div className="payback-preview">
+                      <h3>Live Preview — Slide 17</h3>
+                      <div className="pb-scroll">
+                        <table className="pb-table">
+                          <tbody>
+                            <tr><th>Options</th>{pb.columns.map((c, k) => <th key={k}>{c.title}</th>)}</tr>
+                            <tr><td>System</td>{pb.columns.map((c, k) => <td key={k}>{c.system}</td>)}</tr>
+                            <tr><td>CAPEX (MMK)</td>{pb.columns.map((c, k) => <td key={k}>{mmk(c.capex)}</td>)}</tr>
+                            <tr><td>EPC / Month</td>{pb.columns.map((_, k) => <td key={k}>{mmk(pb.epcMonth)} Units</td>)}</tr>
+                            <tr><td>EPC / Year (MMK)</td>{pb.columns.map((_, k) => <td key={k}>{mmk(pb.epcYear)}</td>)}</tr>
+                            <tr><td>Solar / Month</td>{pb.columns.map((c, k) => <td key={k}>{mmk(c.solarMonth)} Units</td>)}</tr>
+                            <tr><td>Solar / Year</td>{pb.columns.map((c, k) => <td key={k}>{mmk(c.solarYear)} Units</td>)}</tr>
+                            <tr><td>Payback Period</td>{pb.columns.map((c, k) => <td key={k}>{c.payback} Years</td>)}</tr>
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   );
                 })()}

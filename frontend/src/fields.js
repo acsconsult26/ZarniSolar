@@ -127,6 +127,39 @@ export const SECTIONS = [
   },
 ];
 
+// inserted before ROI section so slide order reads naturally; see SECTIONS unshift below
+export const PAYBACK_SECTION = {
+  key: "payback",
+  title: "Payback Table (Slide 17)",
+  paybackTable: true,
+  note: "Payback comparison across the options above. Per-option spec & payback years are entered in the System Options step.",
+  fields: [
+    { name: "payback_epc_units_month", label: "Total EPC Units / Month (same for all)", help: "ဥပမာ — 27000", type: "number" },
+    { name: "payback_unit_cost", label: "Average Unit Cost (MMK)", help: "ဥပမာ — 500", type: "number" },
+  ],
+};
+SECTIONS.push(PAYBACK_SECTION);
+
+export function paybackRows(data) {
+  const n = (v) => Number(v) || 0;
+  const epcMonth = n(data.payback_epc_units_month);
+  const cost = n(data.payback_unit_cost);
+  const epcYear = epcMonth * 12 * cost;
+  const opts = (data.system_options || []).slice(0, 4);
+  const i0 = (x) => (x === "" || x == null ? "—" : x);
+  return {
+    epcMonth, epcYear,
+    columns: opts.map((o) => ({
+      title: o.title || "Option",
+      system: `${i0(o.solar_count)} Solar, ${i0(o.inverter_power)}kW, ${i0(o.battery_capacity)}kWh, ${i0(o.backup_hours)}Hrs`,
+      capex: n(o.capex),
+      solarMonth: n(o.solar_units) * 30,
+      solarYear: n(o.solar_units) * 30 * 12,
+      payback: i0(o.payback_years),
+    })),
+  };
+}
+
 export function roiCompute(data) {
   const num = (v) => Number(v) || 0;
   const n1 = num(data.roi_total_epc_units);

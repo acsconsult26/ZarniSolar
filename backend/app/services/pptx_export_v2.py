@@ -105,6 +105,11 @@ def export_project_v2(project, storage, company_info=None) -> bytes:
         page = len(prs.slides._sldIdLst) + 1
         _slide_usage_chart(prs, data, chart_opts, company_name, page)
 
+    # Slide 17 : payback comparison table
+    if options and (data.get("payback_epc_units_month") or any(o.get("payback_years") for o in options)):
+        page = len(prs.slides._sldIdLst) + 1
+        _slide_payback(prs, data, options[:4], company_name, page)
+
     import io
     out = io.BytesIO()
     prs.save(out)
@@ -420,6 +425,75 @@ def _slide_roi(prs, v, company_name, page):
                f"{years} နှစ်အတွင်း ချွေတာနိုင်မှု = {i(total_epc)} − {i(total_solar)} = {i(savings)} ကျပ်",
                Inches(0.7), prs.slide_height - Inches(1.05), width, Inches(0.5),
                size=15, bold=True, color=T.WHITE, align=PP_ALIGN.CENTER)
+
+
+def _slide_payback(prs, data, options, company_name, page):
+    def n(x):
+        try:
+            return float(x)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def i0(x):
+        return "—" if x in (None, "") else (f"{int(float(x))}" if float(x).is_integer() else f"{float(x):g}")
+
+    epc_month = n(data.get("payback_epc_units_month"))
+    cost = n(data.get("payback_unit_cost"))
+    epc_year_cost = epc_month * 12 * cost
+
+    slide = T.add_slide(prs, page=page, company_name=company_name)
+    top = T.add_title(slide, prs, "အရင်းကြေကာလ ရှင်းလင်းတင်ပြခြင်း")
+
+    labels = ["", "System", "CAPEX (MMK)", "EPC / Month", "EPC / Year (MMK)",
+              "Solar / Month", "Solar / Year", "Payback Period"]
+    ncols = 1 + len(options)
+    nrows = 8
+    left = Inches(0.5)
+    width = prs.slide_width - Inches(1.0)
+    height = prs.slide_height - top - Inches(0.7)
+    gf = slide.shapes.add_table(nrows, ncols, left, top, int(width), int(height))
+    table = gf.table
+    table.first_row = False
+    table.horz_banding = False
+    label_w = int(width * 0.20)
+    opt_w = int((width - label_w) / len(options))
+    table.columns[0].width = label_w
+    for c in range(1, ncols):
+        table.columns[c].width = opt_w
+
+    def cell(r, c, text, *, size, bold, color, bg):
+        cl = table.cell(r, c)
+        cl.fill.solid(); cl.fill.fore_color.rgb = bg
+        cl.vertical_anchor = MSO_ANCHOR.MIDDLE
+        cl.margin_left = Inches(0.06); cl.margin_right = Inches(0.06)
+        cl.margin_top = Pt(2); cl.margin_bottom = Pt(2)
+        tf = cl.text_frame; tf.word_wrap = True
+        tf.paragraphs[0].alignment = PP_ALIGN.CENTER
+        run = tf.paragraphs[0].add_run()
+        T._apply_run(run, text, size=size, bold=bold, italic=False, color=color, font=T.FONT)
+
+    # label column
+    cell(0, 0, "Options", size=12, bold=True, color=T.WHITE, bg=T.ACCENT)
+    for r in range(1, nrows):
+        cell(r, 0, labels[r], size=12, bold=True, color=T.WHITE, bg=T.BG)
+
+    for ci, o in enumerate(options, start=1):
+        solar_c = o.get("solar_count"); inv = o.get("inverter_power")
+        batt = o.get("battery_capacity"); backup = o.get("backup_hours")
+        system_txt = f"{i0(solar_c)} Solar, {i0(inv)}kW, {i0(batt)}kWh, {i0(backup)}Hrs"
+        solar_units = n(o.get("solar_units"))
+        solar_month = solar_units * 30
+        solar_year = solar_month * 12
+        py = o.get("payback_years")
+
+        cell(0, ci, o.get("title") or f"Option {ci}", size=13, bold=True, color=T.WHITE, bg=T.ACCENT)
+        cell(1, ci, system_txt, size=11, bold=False, color=T.WHITE, bg=T.PANEL)
+        cell(2, ci, _money(o.get("capex")), size=12, bold=True, color=T.GOLD, bg=T.PANEL)
+        cell(3, ci, f"{_money(epc_month)} Units", size=11, bold=False, color=T.WHITE, bg=T.PANEL)
+        cell(4, ci, _money(epc_year_cost), size=11, bold=False, color=T.WHITE, bg=T.PANEL)
+        cell(5, ci, f"{_money(solar_month)} Units", size=11, bold=False, color=T.WHITE, bg=T.PANEL)
+        cell(6, ci, f"{_money(solar_year)} Units", size=11, bold=False, color=T.WHITE, bg=T.PANEL)
+        cell(7, ci, f"{i0(py)} Years", size=12, bold=True, color=T.GOLD, bg=T.PANEL)
 
 
 def _slide_usage_chart(prs, data, chart_opts, company_name, page):
