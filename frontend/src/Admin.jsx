@@ -799,7 +799,7 @@ const PAGE_TITLES = {
   settings: "Settings",
 };
 
-export default function Admin({ onEditClient, onExit, currentEmail }) {
+export default function Admin({ onEditClient, onExit, onLogout, currentEmail, userName }) {
   const [tab, setTab] = useState("dashboard");
 
   return (
@@ -824,6 +824,10 @@ export default function Admin({ onEditClient, onExit, currentEmail }) {
       <main className="admin-main">
         <header className="admin-topbar">
           <h2>{PAGE_TITLES[tab]}</h2>
+          <div className="admin-topbar-actions">
+            <span className="admin-user-chip">{userName}</span>
+            <button className="icon-btn" title="Log out" onClick={onLogout}>⏻</button>
+          </div>
         </header>
         <div className="admin-content">
           {tab === "dashboard" && <DashboardTab onGoTo={setTab} />}

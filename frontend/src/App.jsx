@@ -407,29 +407,37 @@ function ProposalForm({ initialProject, onExitToPicker }) {
 
   const section = SECTIONS[step];
   const sectionEnabled = !section?.optionalToggle || !!data[section.optionalToggle];
+  const totalSteps = SECTIONS.length + 1;
+  const isReview = step === SECTIONS.length;
+  const currentTitle = isReview ? "Review & Export" : section.title;
+  const pct = Math.round(((step + 1) / totalSteps) * 100);
 
   return (
     <div className="app">
-      <header>
-        <h1>Zarni Solar — Proposal</h1>
+      <div className="wizard-meta-row">
+        {clientName && <span className="client-badge">{clientName}</span>}
         <input className="project-name" value={name} onChange={(e) => setName(e.target.value)} />
-        {clientName && <span className="project-id">Client: {clientName}</span>}
-        {projectId && <span className="project-id">Project #{projectId}</span>}
+        {projectId && <span className="project-id">#{projectId}</span>}
         <button className="new-project-btn" onClick={onExitToPicker}>+ New</button>
-      </header>
+      </div>
 
-      <nav className="steps">
-        {SECTIONS.map((s, i) => (
-          <button key={s.key} className={i === step ? "active" : ""} onClick={() => setStep(i)}>
-            {i + 1}. {s.title}
-          </button>
-        ))}
-        <button className={step === SECTIONS.length ? "active" : ""} onClick={() => setStep(SECTIONS.length)}>
-          Review &amp; Export
-        </button>
-      </nav>
+      <div className="wizard-progress">
+        <div className="wizard-progress-top">
+          <span className="wizard-step-label">Step {step + 1} of {totalSteps}</span>
+          <span className="wizard-step-title">{currentTitle}</span>
+        </div>
+        <div className="wizard-progress-bar">
+          <div className="wizard-progress-fill" style={{ width: `${pct}%` }} />
+        </div>
+        <select className="wizard-jump" value={step} onChange={(e) => setStep(Number(e.target.value))}>
+          {SECTIONS.map((s, i) => (
+            <option key={s.key} value={i}>{i + 1}. {s.title}</option>
+          ))}
+          <option value={SECTIONS.length}>{totalSteps}. Review &amp; Export</option>
+        </select>
+      </div>
 
-      <main>
+      <main className="wizard-body">
         {step < SECTIONS.length && (
           <section className="form-section">
             <h2>{section.title}</h2>
@@ -545,10 +553,12 @@ function ProposalForm({ initialProject, onExitToPicker }) {
         )}
       </main>
 
-      <footer>
-        <button disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))}>Back</button>
-        <button disabled={step === SECTIONS.length} onClick={() => setStep((s) => Math.min(SECTIONS.length, s + 1))}>Next</button>
-      </footer>
+      <div className="wizard-footer">
+        <button disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))}>← Back</button>
+        {!isReview && (
+          <button className="primary" onClick={() => setStep((s) => Math.min(SECTIONS.length, s + 1))}>Next →</button>
+        )}
+      </div>
     </div>
   );
 }
@@ -598,22 +608,36 @@ export default function App() {
 
   const isAdmin = user?.role === "admin";
 
+  // Admin panel is a fully separate full-screen shell (own header + sidebar) —
+  // no shared chrome with the staff proposal form.
+  if (view === "admin" && isAdmin) {
+    return (
+      <Admin
+        currentEmail={user.email}
+        userName={user.name || user.email}
+        onEditClient={editProject}
+        onExit={() => setView("form")}
+        onLogout={logout}
+      />
+    );
+  }
+
   return (
     <>
-      <div className="brand-logo">
-        <img src="/zarni-logo.png" alt="Zarni Electronics" />
-      </div>
-      <div className="topnav">
-        <button className={view === "form" ? "active" : ""} onClick={() => setView("form")}>Proposal Form</button>
-        {isAdmin && (
-          <button className={view === "admin" ? "active" : ""} onClick={() => setView("admin")}>Admin</button>
-        )}
-        <button onClick={logout}>Log out ({user?.name || user?.email})</button>
+      <div className="topbar">
+        <div className="topbar-brand">
+          <img src="/zarni-logo.png" alt="Zarni Electronics" />
+          <span>Zarni Solar</span>
+        </div>
+        <div className="topbar-actions">
+          {isAdmin && (
+            <button className="topbar-link" onClick={() => setView("admin")}>Admin</button>
+          )}
+          <button className="icon-btn" title={`Log out (${user?.name || user?.email})`} onClick={logout}>⏻</button>
+        </div>
       </div>
 
-      {view === "admin" && isAdmin ? (
-        <Admin currentEmail={user.email} onEditClient={editProject} onExit={() => setView("form")} />
-      ) : activeProject === null ? (
+      {activeProject === null ? (
         <div className="app">
           <ClientPicker onPicked={(p) => setActiveProject(p)} />
         </div>
