@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
 
-const TOKEN_KEY = "zarni_admin_token";
 const FALLBACK_CATEGORIES = [
   { key: "panel", label: "Solar Panel" },
   { key: "inverter", label: "Inverter" },
@@ -10,45 +9,6 @@ const FALLBACK_CATEGORIES = [
 
 function slugify(s) {
   return (s || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
-}
-
-function Login({ onLoggedIn }) {
-  const [email, setEmail] = useState("admin@zarni.com");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState(null);
-  const [busy, setBusy] = useState(false);
-
-  async function submit(e) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      const { token } = await api.login(email, password);
-      localStorage.setItem(TOKEN_KEY, token);
-      onLoggedIn(token);
-    } catch (err) {
-      setError("Invalid email or password");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <form className="admin-login" onSubmit={submit}>
-      <h2>Admin Login</h2>
-      <label>
-        <span>Email</span>
-        <input value={email} onChange={(e) => setEmail(e.target.value)} />
-      </label>
-      <label>
-        <span>Password</span>
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-      </label>
-      {error && <p className="error">{error}</p>}
-      <button type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
-      <p className="hint">Demo account: admin@zarni.com / demo1234</p>
-    </form>
-  );
 }
 
 const EMPTY_PRODUCT = { category: "panel", brand: "", model_name: "", unit_value: "", unit_label: "", spec_title: "", warranty_line: "" };
@@ -330,7 +290,7 @@ function ProductsTab({ token }) {
   );
 }
 
-function ClientsTab({ onEditClient }) {
+function ProposalsTab({ onEditClient }) {
   const [projects, setProjects] = useState([]);
 
   async function refresh() { setProjects(await api.listProjects()); }
@@ -340,24 +300,26 @@ function ClientsTab({ onEditClient }) {
     await api.exportProject(id);
   }
   async function remove(id) {
-    if (!confirm("Delete this client/proposal?")) return;
+    if (!confirm("Delete this proposal?")) return;
     await api.deleteProject(id);
     refresh();
   }
 
   return (
     <div className="admin-card">
-      <h3>Clients & History ({projects.length})</h3>
+      <h3>Proposals & History ({projects.length})</h3>
       <table className="clients-table">
         <thead>
-          <tr><th>#</th><th>Name</th><th>Site</th><th>Updated</th><th>Actions</th></tr>
+          <tr><th>#</th><th>Client</th><th>Proposal Name</th><th>Site</th><th>Status</th><th>Updated</th><th>Actions</th></tr>
         </thead>
         <tbody>
           {projects.map((p) => (
             <tr key={p.id}>
               <td>{p.id}</td>
+              <td>{p.client_name || "—"}</td>
               <td>{p.name}</td>
               <td>{p.data?.site_name || "—"}</td>
+              <td>{p.status}</td>
               <td>{p.updated_at ? new Date(p.updated_at).toLocaleString() : "—"}</td>
               <td className="row">
                 <button onClick={() => onEditClient(p.id)}>Edit</button>
@@ -372,14 +334,241 @@ function ClientsTab({ onEditClient }) {
   );
 }
 
+const EMPTY_CLIENT = { name: "", phone: "", email: "", organization: "", address: "", notes: "" };
+
+function ClientModal({ initial, onClose, onSaved }) {
+  const [form, setForm] = useState(initial);
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const editingId = initial.id || null;
+
+  function set(k, v) { setForm((f) => ({ ...f, [k]: v })); }
+
+  async function save(e) {
+    e.preventDefault();
+    if (!form.name.trim()) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const body = { name: form.name, phone: form.phone, email: form.email, organization: form.organization, address: form.address, notes: form.notes };
+      if (editingId) await api.updateClient(editingId, body);
+      else await api.createClient(body);
+      onSaved();
+    } catch (err) {
+      setError(String(err));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onMouseDown={onClose}>
+      <form className="modal" onMouseDown={(e) => e.stopPropagation()} onSubmit={save}>
+        <div className="modal-head">
+          <h3>{editingId ? "Edit Client" : "Add Client"}</h3>
+          <button type="button" className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <label><span>Name *</span><input value={form.name} onChange={(e) => set("name", e.target.value)} autoFocus /></label>
+          <div className="row">
+            <label><span>Phone</span><input value={form.phone || ""} onChange={(e) => set("phone", e.target.value)} /></label>
+            <label><span>Email</span><input value={form.email || ""} onChange={(e) => set("email", e.target.value)} /></label>
+          </div>
+          <label><span>Organization</span><input value={form.organization || ""} onChange={(e) => set("organization", e.target.value)} /></label>
+          <label><span>Address</span><input value={form.address || ""} onChange={(e) => set("address", e.target.value)} /></label>
+          <label><span>Notes</span><textarea rows={3} value={form.notes || ""} onChange={(e) => set("notes", e.target.value)} /></label>
+          {error && <p className="error">{error}</p>}
+        </div>
+        <div className="modal-foot">
+          <button type="button" className="ghost" onClick={onClose}>Cancel</button>
+          <button type="submit" disabled={busy || !form.name.trim()}>{busy ? "Saving…" : editingId ? "Save changes" : "Add client"}</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function ClientsTab() {
+  const [clients, setClients] = useState([]);
+  const [modal, setModal] = useState(null);
+
+  async function refresh() { setClients(await api.listClients()); }
+  useEffect(() => { refresh(); }, []);
+
+  async function remove(id) {
+    if (!confirm("Delete this client? (Only allowed if they have no proposals.)")) return;
+    try {
+      await api.deleteClient(id);
+      refresh();
+    } catch (err) {
+      alert(String(err));
+    }
+  }
+
+  return (
+    <div className="admin-card">
+      <div className="catalog-head">
+        <h3>Clients ({clients.length})</h3>
+        <button className="add-product-btn" onClick={() => setModal(EMPTY_CLIENT)}>+ Add Client</button>
+      </div>
+      <table className="clients-table">
+        <thead>
+          <tr><th>Name</th><th>Phone</th><th>Email</th><th>Organization</th><th>Proposals</th><th></th></tr>
+        </thead>
+        <tbody>
+          {clients.length === 0 && <tr><td colSpan={6} className="empty-row">No clients yet.</td></tr>}
+          {clients.map((c) => (
+            <tr key={c.id}>
+              <td>{c.name}</td>
+              <td>{c.phone || "—"}</td>
+              <td>{c.email || "—"}</td>
+              <td>{c.organization || "—"}</td>
+              <td>{c.project_count}</td>
+              <td className="row-actions">
+                <button onClick={() => setModal(c)}>Edit</button>
+                <button className="danger" onClick={() => remove(c.id)}>Delete</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {modal && (
+        <ClientModal initial={modal} onClose={() => setModal(null)} onSaved={() => { setModal(null); refresh(); }} />
+      )}
+    </div>
+  );
+}
+
+const EMPTY_USER = { email: "", name: "", role: "staff", password: "" };
+
+function UserModal({ initial, onClose, onSaved }) {
+  const [form, setForm] = useState(initial);
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const editingId = initial.id || null;
+
+  function set(k, v) { setForm((f) => ({ ...f, [k]: v })); }
+
+  async function save(e) {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      if (editingId) {
+        const body = { name: form.name, role: form.role, is_active: form.is_active };
+        if (form.password) body.password = form.password;
+        await api.updateUser(editingId, body);
+      } else {
+        await api.createUser({ email: form.email, name: form.name, role: form.role, password: form.password });
+      }
+      onSaved();
+    } catch (err) {
+      setError(String(err));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onMouseDown={onClose}>
+      <form className="modal" onMouseDown={(e) => e.stopPropagation()} onSubmit={save}>
+        <div className="modal-head">
+          <h3>{editingId ? "Edit User" : "Add User"}</h3>
+          <button type="button" className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <label><span>Email {editingId ? "" : "*"}</span>
+            <input value={form.email} disabled={!!editingId} onChange={(e) => set("email", e.target.value)} />
+          </label>
+          <label><span>Name</span><input value={form.name || ""} onChange={(e) => set("name", e.target.value)} /></label>
+          <label><span>Role</span>
+            <select value={form.role} onChange={(e) => set("role", e.target.value)}>
+              <option value="staff">Staff</option>
+              <option value="admin">Admin</option>
+            </select>
+          </label>
+          {editingId && (
+            <label><span>Active</span>
+              <select value={form.is_active === false ? "no" : "yes"} onChange={(e) => set("is_active", e.target.value === "yes")}>
+                <option value="yes">Active</option>
+                <option value="no">Disabled</option>
+              </select>
+            </label>
+          )}
+          <label><span>{editingId ? "New password (leave blank to keep current)" : "Password *"}</span>
+            <input type="password" value={form.password} onChange={(e) => set("password", e.target.value)} />
+          </label>
+          {error && <p className="error">{error}</p>}
+        </div>
+        <div className="modal-foot">
+          <button type="button" className="ghost" onClick={onClose}>Cancel</button>
+          <button type="submit" disabled={busy || (!editingId && (!form.email.trim() || !form.password))}>
+            {busy ? "Saving…" : editingId ? "Save changes" : "Add user"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function UsersTab({ currentEmail }) {
+  const [users, setUsers] = useState([]);
+  const [modal, setModal] = useState(null);
+
+  async function refresh() { setUsers(await api.listUsers()); }
+  useEffect(() => { refresh(); }, []);
+
+  async function remove(id) {
+    if (!confirm("Delete this user?")) return;
+    try {
+      await api.deleteUser(id);
+      refresh();
+    } catch (err) {
+      alert(String(err));
+    }
+  }
+
+  return (
+    <div className="admin-card">
+      <div className="catalog-head">
+        <h3>Staff & Admin Accounts ({users.length})</h3>
+        <button className="add-product-btn" onClick={() => setModal(EMPTY_USER)}>+ Add User</button>
+      </div>
+      <table className="clients-table">
+        <thead>
+          <tr><th>Email</th><th>Name</th><th>Role</th><th>Status</th><th>Last login</th><th></th></tr>
+        </thead>
+        <tbody>
+          {users.map((u) => (
+            <tr key={u.id}>
+              <td>{u.email}</td>
+              <td>{u.name || "—"}</td>
+              <td>{u.role}</td>
+              <td>{u.is_active ? "Active" : "Disabled"}</td>
+              <td>{u.last_login_at ? new Date(u.last_login_at).toLocaleString() : "Never"}</td>
+              <td className="row-actions">
+                <button onClick={() => setModal({ ...u, password: "" })}>Edit</button>
+                <button className="danger" disabled={u.email === currentEmail} onClick={() => remove(u.id)}>Delete</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {modal && (
+        <UserModal initial={modal} onClose={() => setModal(null)} onSaved={() => { setModal(null); refresh(); }} />
+      )}
+    </div>
+  );
+}
+
 function DashboardTab({ onGoTo }) {
   const [products, setProducts] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [clients, setClients] = useState([]);
   const [exportStats, setExportStats] = useState({ total: 0, by_month: {} });
 
   useEffect(() => {
     api.listProductsAll().then(setProducts).catch(() => {});
     api.listProjects().then(setProjects).catch(() => {});
+    api.listClients().then(setClients).catch(() => {});
     api.getBoilerplate("export_stats").then((s) => setExportStats(s || { total: 0, by_month: {} })).catch(() => {});
   }, []);
 
@@ -392,10 +581,10 @@ function DashboardTab({ onGoTo }) {
   const exportsThisMonth = (exportStats.by_month || {})[thisMonth] || 0;
 
   const stats = [
-    { label: "Total Clients", value: projects.length, accent: "blue", to: "clients" },
-    { label: "Products", value: products.length, accent: "gold", to: "products" },
-    { label: "Exports (Total)", value: exportStats.total || 0, accent: "red", to: "clients" },
-    { label: "Exports This Month", value: exportsThisMonth, accent: "blue", to: "clients" },
+    { label: "Total Clients", value: clients.length, accent: "blue", to: "clients" },
+    { label: "Total Proposals", value: projects.length, accent: "gold", to: "proposals" },
+    { label: "Exports (Total)", value: exportStats.total || 0, accent: "red", to: "proposals" },
+    { label: "Exports This Month", value: exportsThisMonth, accent: "blue", to: "proposals" },
   ];
 
   const cats = [
@@ -446,7 +635,7 @@ function DashboardTab({ onGoTo }) {
         </div>
 
         <div className="admin-card">
-          <h3>Clients by Month</h3>
+          <h3>Proposals by Month</h3>
           {clientMonths.length === 0 ? (
             <p className="hint">No clients yet.</p>
           ) : (
@@ -585,7 +774,7 @@ function SettingsTab({ token }) {
 
       <div className="admin-card">
         <h3>Backend Settings (read-only)</h3>
-        <div className="settings-block"><h4>Admin Account</h4><p className="hint">Change via <code>ADMIN_EMAIL</code> / <code>ADMIN_PASSWORD</code> env vars.</p></div>
+        <div className="settings-block"><h4>Admin/Staff accounts</h4><p className="hint">Manage via the Users tab.</p></div>
         <div className="settings-block"><h4>AI Provider</h4><p className="hint">Set <code>IMAGE_GEN_PROVIDER</code> / <code>IMAGE_GEN_API_KEY</code> env vars to enable slide-19 generation.</p></div>
       </div>
     </div>
@@ -596,21 +785,22 @@ const NAV = [
   { key: "dashboard", label: "Dashboard", icon: "▦" },
   { key: "products", label: "Products", icon: "▢" },
   { key: "clients", label: "Clients", icon: "☺" },
+  { key: "proposals", label: "Proposals", icon: "▤" },
+  { key: "users", label: "Users", icon: "◈" },
   { key: "settings", label: "Settings", icon: "⚙" },
 ];
 
-const PAGE_TITLES = { dashboard: "Dashboard", products: "Product Catalog", clients: "Clients & History", settings: "Settings" };
+const PAGE_TITLES = {
+  dashboard: "Dashboard",
+  products: "Product Catalog",
+  clients: "Clients",
+  proposals: "Proposals & History",
+  users: "Staff & Admin Accounts",
+  settings: "Settings",
+};
 
-export default function Admin({ onEditClient, onExit }) {
-  const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
+export default function Admin({ onEditClient, onExit, currentEmail }) {
   const [tab, setTab] = useState("dashboard");
-
-  function logout() {
-    localStorage.removeItem(TOKEN_KEY);
-    setToken(null);
-  }
-
-  if (!token) return <Login onLoggedIn={setToken} />;
 
   return (
     <div className="admin-shell">
@@ -628,7 +818,6 @@ export default function Admin({ onEditClient, onExit }) {
         </nav>
         <div className="sidebar-foot">
           <button className="sidebar-link" onClick={onExit}>← Proposal Form</button>
-          <button className="sidebar-logout" onClick={logout}>Log out</button>
         </div>
       </aside>
 
@@ -638,9 +827,11 @@ export default function Admin({ onEditClient, onExit }) {
         </header>
         <div className="admin-content">
           {tab === "dashboard" && <DashboardTab onGoTo={setTab} />}
-          {tab === "products" && <ProductsTab token={token} />}
-          {tab === "clients" && <ClientsTab onEditClient={onEditClient} />}
-          {tab === "settings" && <SettingsTab token={token} />}
+          {tab === "products" && <ProductsTab />}
+          {tab === "clients" && <ClientsTab />}
+          {tab === "proposals" && <ProposalsTab onEditClient={onEditClient} />}
+          {tab === "users" && <UsersTab currentEmail={currentEmail} />}
+          {tab === "settings" && <SettingsTab />}
         </div>
       </main>
     </div>

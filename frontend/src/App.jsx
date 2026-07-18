@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { api } from "./api";
+import { api, getToken, clearToken } from "./api";
 import { SECTIONS, perUnitCost, roiCompute, paybackRows } from "./fields";
 import RichText from "./RichText";
 import Admin from "./Admin";
+import Login from "./Login";
 import "./App.css";
 
 function ProductSelect({ field, value, onChange }) {
@@ -247,20 +248,127 @@ function SystemOptions({ data, setField }) {
   );
 }
 
-export default function App() {
-  const [projectId, setProjectId] = useState(null);
-  const [name, setName] = useState("Untitled Project");
-  const [data, setData] = useState({});
-  const [uploads, setUploads] = useState({});
+function ClientPicker({ onPicked }) {
+  const [clients, setClients] = useState([]);
+  const [search, setSearch] = useState("");
+  const [showNew, setShowNew] = useState(false);
+  const [newClient, setNewClient] = useState({ name: "", phone: "", email: "", organization: "" });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => { api.listClients().then(setClients).catch(() => {}); }, []);
+
+  const filtered = clients.filter((c) =>
+    !search.trim() || c.name.toLowerCase().includes(search.trim().toLowerCase())
+  );
+
+  async function pickExisting(client) {
+    setBusy(true);
+    setError(null);
+    try {
+      const p = await api.createProject({ name: `${client.name} Proposal`, data: {}, client_id: client.id });
+      onPicked(p, client);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createAndPick(e) {
+    e.preventDefault();
+    if (!newClient.name.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const client = await api.createClient(newClient);
+      await pickExisting(client);
+    } catch (err) {
+      setError(String(err));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="form-section client-picker">
+      <h2>Start a New Proposal</h2>
+      <p className="section-note">Pick the client this proposal is for, or add a new one.</p>
+
+      {!showNew && (
+        <>
+          <input
+            className="project-name"
+            style={{ maxWidth: "100%", marginBottom: "0.9rem" }}
+            placeholder="Search clients…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <table className="clients-table">
+            <thead><tr><th>Name</th><th>Phone</th><th>Organization</th><th>Proposals</th><th></th></tr></thead>
+            <tbody>
+              {filtered.length === 0 && (
+                <tr><td colSpan={5} className="empty-row">No clients found.</td></tr>
+              )}
+              {filtered.map((c) => (
+                <tr key={c.id}>
+                  <td>{c.name}</td>
+                  <td>{c.phone || "—"}</td>
+                  <td>{c.organization || "—"}</td>
+                  <td>{c.project_count}</td>
+                  <td><button disabled={busy} onClick={() => pickExisting(c)}>Use this client</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <button className="add-option-btn" style={{ marginTop: "1rem" }} onClick={() => setShowNew(true)}>
+            + New Client
+          </button>
+        </>
+      )}
+
+      {showNew && (
+        <form onSubmit={createAndPick} className="field-grid" style={{ marginTop: "0.5rem" }}>
+          <label className="field">
+            <span className="field-label">Client / Company Name *</span>
+            <input value={newClient.name} onChange={(e) => setNewClient({ ...newClient, name: e.target.value })} autoFocus />
+          </label>
+          <label className="field">
+            <span className="field-label">Phone</span>
+            <input value={newClient.phone} onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })} />
+          </label>
+          <label className="field">
+            <span className="field-label">Email</span>
+            <input value={newClient.email} onChange={(e) => setNewClient({ ...newClient, email: e.target.value })} />
+          </label>
+          <label className="field">
+            <span className="field-label">Organization</span>
+            <input value={newClient.organization} onChange={(e) => setNewClient({ ...newClient, organization: e.target.value })} />
+          </label>
+          <div className="field field-wide export-actions">
+            <button type="button" onClick={() => setShowNew(false)}>Cancel</button>
+            <button type="submit" className="primary" disabled={busy || !newClient.name.trim()}>
+              {busy ? "Creating…" : "Create Client & Continue"}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {error && <p className="error">{error}</p>}
+    </section>
+  );
+}
+
+function ProposalForm({ initialProject, onExitToPicker }) {
+  const [projectId, setProjectId] = useState(initialProject?.id ?? null);
+  const [clientName, setClientName] = useState(initialProject?.client_name ?? null);
+  const [name, setName] = useState(initialProject?.name ?? "Untitled Project");
+  const [data, setData] = useState(initialProject?.data ?? {});
+  const [uploads, setUploads] = useState(initialProject?.uploads ?? {});
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportError, setExportError] = useState(null);
-  const [view, setView] = useState("form");
-
-  useEffect(() => {
-    api.createProject({ name: "Untitled Project", data: {} }).then((p) => setProjectId(p.id));
-  }, []);
+  const view = "form";
 
   // Debounced auto-save
   useEffect(() => {
@@ -271,26 +379,6 @@ export default function App() {
 
   function setField(fieldName, value) {
     setData((d) => ({ ...d, [fieldName]: value }));
-  }
-
-  async function loadProject(id) {
-    const p = await api.getProject(id);
-    setProjectId(p.id);
-    setName(p.name);
-    setData(p.data || {});
-    setUploads(p.uploads || {});
-    setStep(0);
-    setView("form");
-  }
-
-  async function newProject() {
-    const p = await api.createProject({ name: "Untitled Project", data: {} });
-    setProjectId(p.id);
-    setName("Untitled Project");
-    setData({});
-    setUploads({});
-    setStep(0);
-    setView("form");
   }
 
   async function saveDraft() {
@@ -317,29 +405,17 @@ export default function App() {
     }
   }
 
-  if (view === "admin") {
-    return <Admin onEditClient={loadProject} onExit={() => setView("form")} />;
-  }
-
   const section = SECTIONS[step];
   const sectionEnabled = !section?.optionalToggle || !!data[section.optionalToggle];
 
   return (
     <div className="app">
-      <div className="brand-logo">
-        <img src="/zarni-logo.png" alt="Zarni Electronics" />
-      </div>
-
-      <div className="topnav">
-        <button className={view === "form" ? "active" : ""} onClick={() => setView("form")}>Proposal Form</button>
-        <button className={view === "admin" ? "active" : ""} onClick={() => setView("admin")}>Admin</button>
-      </div>
-
       <header>
         <h1>Zarni Solar — Proposal</h1>
         <input className="project-name" value={name} onChange={(e) => setName(e.target.value)} />
+        {clientName && <span className="project-id">Client: {clientName}</span>}
         {projectId && <span className="project-id">Project #{projectId}</span>}
-        <button className="new-project-btn" onClick={newProject}>+ New</button>
+        <button className="new-project-btn" onClick={onExitToPicker}>+ New</button>
       </header>
 
       <nav className="steps">
@@ -474,5 +550,80 @@ export default function App() {
         <button disabled={step === SECTIONS.length} onClick={() => setStep((s) => Math.min(SECTIONS.length, s + 1))}>Next</button>
       </footer>
     </div>
+  );
+}
+
+export default function App() {
+  const [authState, setAuthState] = useState("checking"); // checking | out | in
+  const [user, setUser] = useState(null);
+  const [view, setView] = useState("form"); // form | admin
+  const [activeProject, setActiveProject] = useState(null); // null = show client picker
+
+  useEffect(() => {
+    if (!getToken()) {
+      setAuthState("out");
+      return;
+    }
+    api.me().then((me) => {
+      setUser(me);
+      setAuthState("in");
+    }).catch(() => {
+      clearToken();
+      setAuthState("out");
+    });
+  }, []);
+
+  function handleLoggedIn(loginResult) {
+    setUser(loginResult);
+    setAuthState("in");
+  }
+
+  function logout() {
+    clearToken();
+    setUser(null);
+    setAuthState("out");
+    setActiveProject(null);
+    setView("form");
+  }
+
+  function editProject(id) {
+    api.getProject(id).then((p) => {
+      setActiveProject(p);
+      setView("form");
+    });
+  }
+
+  if (authState === "checking") return null;
+  if (authState === "out") return <Login onLoggedIn={handleLoggedIn} />;
+
+  const isAdmin = user?.role === "admin";
+
+  return (
+    <>
+      <div className="brand-logo">
+        <img src="/zarni-logo.png" alt="Zarni Electronics" />
+      </div>
+      <div className="topnav">
+        <button className={view === "form" ? "active" : ""} onClick={() => setView("form")}>Proposal Form</button>
+        {isAdmin && (
+          <button className={view === "admin" ? "active" : ""} onClick={() => setView("admin")}>Admin</button>
+        )}
+        <button onClick={logout}>Log out ({user?.name || user?.email})</button>
+      </div>
+
+      {view === "admin" && isAdmin ? (
+        <Admin currentEmail={user.email} onEditClient={editProject} onExit={() => setView("form")} />
+      ) : activeProject === null ? (
+        <div className="app">
+          <ClientPicker onPicked={(p) => setActiveProject(p)} />
+        </div>
+      ) : (
+        <ProposalForm
+          key={activeProject.id}
+          initialProject={activeProject}
+          onExitToPicker={() => setActiveProject(null)}
+        />
+      )}
+    </>
   );
 }
