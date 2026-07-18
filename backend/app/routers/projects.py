@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Respons
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import Project, Product
+from ..models import Project, Product, Client
 from ..storage import storage
 from ..schema import merged_field_values
 from ..services.pptx_export_v2 import export_project_v2
@@ -11,8 +11,9 @@ from ..services import imagegen
 from ..services.flowchart import render_priority_flowchart
 from ..services.text_drafts import compose_power_priority_draft
 from .. import boilerplate as bp
+from ..auth import get_current_user
 
-router = APIRouter(prefix="/projects", tags=["projects"])
+router = APIRouter(prefix="/projects", tags=["projects"], dependencies=[Depends(get_current_user)])
 
 
 def _gather_selected_products(data: dict, db: Session) -> dict:
@@ -41,19 +42,33 @@ def _gather_selected_products(data: dict, db: Session) -> dict:
 def _serialize(p: Project) -> dict:
     return {
         "id": p.id,
+        "client_id": p.client_id,
+        "client_name": p.client.name if p.client else None,
         "name": p.name,
+        "status": p.status,
         "data": p.data or {},
         "uploads": p.uploads or {},
         "computed": merged_field_values(p.data or {}),
         "slide19_image_url": storage.url_for(p.slide19_image_path) if storage.exists(p.slide19_image_path) else None,
+        "export_count": p.export_count,
+        "last_exported_at": p.last_exported_at.isoformat() if p.last_exported_at else None,
         "created_at": p.created_at.isoformat() if p.created_at else None,
         "updated_at": p.updated_at.isoformat() if p.updated_at else None,
     }
 
 
 @router.post("")
-def create_project(body: dict, db: Session = Depends(get_db)):
-    project = Project(name=body.get("name", "Untitled Project"), data=body.get("data", {}), uploads={})
+def create_project(body: dict, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    client_id = body.get("client_id")
+    if client_id and not db.query(Client).get(client_id):
+        raise HTTPException(404, "Client not found")
+    project = Project(
+        name=body.get("name", "Untitled Project"),
+        data=body.get("data", {}),
+        uploads={},
+        client_id=client_id,
+        created_by_id=user.id,
+    )
     db.add(project)
     db.commit()
     db.refresh(project)
@@ -82,6 +97,10 @@ def update_project(project_id: int, body: dict, db: Session = Depends(get_db)):
         project.name = body["name"]
     if "data" in body:
         project.data = body["data"]
+    if "client_id" in body:
+        if body["client_id"] and not db.query(Client).get(body["client_id"]):
+            raise HTTPException(404, "Client not found")
+        project.client_id = body["client_id"]
     db.commit()
     db.refresh(project)
     return _serialize(project)
@@ -189,6 +208,10 @@ def export(project_id: int, db: Session = Depends(get_db)):
     m = _dt.date.today().strftime("%Y-%m")
     by_month[m] = by_month.get(m, 0) + 1
     bp.write(db, "export_stats", {"total": (stats.get("total", 0) + 1), "by_month": by_month})
+    project.status = "exported"
+    project.export_count = (project.export_count or 0) + 1
+    project.last_exported_at = _dt.datetime.utcnow()
+    db.commit()
     filename = f"{(project.data or {}).get('site_name') or project.name}_proposal.pptx".replace(" ", "_")
     return Response(
         content=pptx_bytes,

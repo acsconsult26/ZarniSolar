@@ -2,27 +2,32 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Body
 from sqlalchemy.orm import Session
 
+import datetime
+
 from ..db import get_db
 from ..models import ReferenceImage
 from ..storage import storage
-from ..auth import verify_credentials, issue_token, require_admin
+from ..auth import authenticate, issue_token, require_admin, get_current_user
 from ..boilerplate import BOILERPLATE_DEFAULTS, EDITABLE_KEYS, get_or_seed
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
 @router.post("/login")
-def login(body: dict):
+def login(body: dict, db: Session = Depends(get_db)):
     email = body.get("email", "")
     password = body.get("password", "")
-    if not verify_credentials(email, password):
+    user = authenticate(db, email, password)
+    if not user:
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    return {"token": issue_token(email), "email": email}
+    user.last_login_at = datetime.datetime.utcnow()
+    db.commit()
+    return {"token": issue_token(user), "email": user.email, "name": user.name, "role": user.role}
 
 
-@router.get("/me", dependencies=[Depends(require_admin)])
-def me():
-    return {"authenticated": True}
+@router.get("/me")
+def me(user=Depends(get_current_user)):
+    return {"authenticated": True, "email": user.email, "name": user.name, "role": user.role}
 
 @router.get("/boilerplate/{key}")
 def get_boilerplate(key: str, db: Session = Depends(get_db)):
