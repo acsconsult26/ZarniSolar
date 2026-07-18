@@ -576,6 +576,7 @@ export default function App() {
     }
     api.me().then((me) => {
       setUser(me);
+      setView(me.role === "admin" ? "admin" : "form");
       setAuthState("in");
     }).catch(() => {
       clearToken();
@@ -585,6 +586,7 @@ export default function App() {
 
   function handleLoggedIn(loginResult) {
     setUser(loginResult);
+    setView(loginResult.role === "admin" ? "admin" : "form");
     setAuthState("in");
   }
 

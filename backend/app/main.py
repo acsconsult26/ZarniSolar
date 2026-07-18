@@ -6,8 +6,10 @@ from .db import Base, engine, SessionLocal
 from .routers import projects, admin, products, users, clients
 from .storage import UPLOAD_DIR
 from .auth import ensure_seed_admin
+from .migrations import auto_migrate
 
 Base.metadata.create_all(bind=engine)
+auto_migrate(engine, Base)
 
 _db = SessionLocal()
 try:

@@ -1,6 +1,6 @@
 # Project Info — Zarni Solar Proposal Generator
 
-Reference doc for AI tools / future sessions. Written 2026-07-18.
+Reference doc for AI tools / future sessions. Written 2026-07-18, updated 2026-07-18.
 
 ## 1. What this project is
 
@@ -123,8 +123,11 @@ totals (total kWp, total kWh, ROI, per-unit cost, etc).
 2. **Pick or create a client** (name/phone/email/organization) — the proposal's `client_id`.
 3. **Fill the multi-step proposal form** (`App.jsx` `SECTIONS`, defined in `fields.js`):
    cover/contact → project background → survey/load data → system design (products,
-   quantities) → power priority → warranty, etc. Live-computed totals (kWp, kWh, ROI,
-   payback) update as you type. Auto-saves as a draft (debounced) on every change.
+   quantities) → power priority → warranty, etc. Presented as a mobile-first step
+   wizard — progress bar, "Step X of 17" counter, and a dropdown to jump to any
+   section, with sticky Back/Next navigation pinned to the bottom of the screen.
+   Live-computed totals (kWp, kWh, ROI, payback) update as you type. Auto-saves as
+   a draft (debounced) on every change.
 4. **Optional AI/data-driven slides**: slide-19-equivalent infographic (pluggable AI
    image gen, falls back to manual upload if no API key configured) and the
    priority-logic flowchart (Graphviz, deterministic — not AI).
@@ -146,16 +149,53 @@ narrative), 31–33 (Solar Mounting Structure design), a standalone 34 (Warranty
 summary slide — currently only per-product warranty lines exist), and 35 (Thank You).
 The CAPEX/payback table is also simplified vs. the notes' full 4-option matrix.
 
-## 9. Bilingual (Burmese) support
+## 9. Frontend UI/UX
+
+- **Staff proposal form and admin panel are fully separate surfaces** — no shared
+  chrome (logo, nav) between them. Each renders its own top bar/header.
+- **Staff form**: minimal top bar (logo + "Zarni Solar" wordmark, an "Admin" link
+  shown only to admin-role users, and a top-right circular logout icon button) above
+  a mobile-first step wizard — see workflow step 3 above.
+- **Admin panel**: full-screen shell with a dark navy sidebar (Dashboard, Products,
+  Clients, Proposals, Users, Settings) and a topbar with the page title on the left
+  and a top-right logout icon button. "← Proposal Form" link sits at the bottom of
+  the sidebar to exit back to the staff form (relevant for admin users, who can see
+  both surfaces).
+- **Logout is always a top-right icon button** in both surfaces — consistent
+  placement was a specific design requirement.
+- No CSS framework; hand-written CSS in `App.css` using CSS custom properties
+  (`--brand-blue`, `--brand-red`, `--brand-gold`, `--navy`) for the Zarni brand palette.
+
+## 10. Bilingual (Burmese) support
 
 The deck mixes English and Burmese (Myanmar Unicode) text. Any text run containing
 Burmese is forced onto the **Pyidaungsu** font (`deck_theme.py`) so it never renders
 as boxes — the viewer's PowerPoint needs a Myanmar Unicode font installed
 (Pyidaungsu / Myanmar Text / Padauk) to display correctly.
 
-## 10. Known simplifications / gaps
+## 11. Schema migrations
+
+There's no Alembic setup. `main.py` runs `Base.metadata.create_all()` (creates any
+wholly-missing tables) followed by `migrations.auto_migrate()` (`backend/app/migrations.py`),
+which diffs each *existing* table's live columns against the SQLAlchemy model and
+issues `ALTER TABLE ... ADD COLUMN` for anything missing, backfilling a SQL default
+where the column has a Python-side default (so `NOT NULL` columns don't break on
+existing rows). This exists because `create_all()` alone never alters a table that's
+already present — a lesson learned the hard way when adding `Project.client_id` /
+`status` / etc. 500'd in production against the pre-existing `projects` table.
+Column *type* changes and drops are still unhandled — only additive column changes
+auto-migrate safely today.
+
+## 12. Known simplifications / gaps
 
 - No S3 file storage yet — uploads live on local disk (`storage.py`), which is
   ephemeral on the Hugging Face free tier (resets on Space restart/rebuild).
 - No password-reset flow — admin resets a user's password directly via the Users tab.
 - `render.yaml` (Render.com) exists but Hugging Face is the actively used backend host.
+- Admin panel's sidebar is not mobile-optimized (wraps into a busy row on narrow
+  screens) — acceptable for now since admin work is expected to happen on desktop;
+  only the staff proposal form was designed mobile-first.
+- Seeded demo accounts (`admin@zarni.com` / staff test accounts) only exist per
+  database — a fresh production DB has just the auto-seeded admin; staff accounts
+  must be created via Admin → Users on that specific deployment, they don't carry
+  over from local testing.
