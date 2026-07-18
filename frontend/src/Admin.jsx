@@ -153,13 +153,74 @@ function ProductModal({ token, initial, onClose, onSaved, categories }) {
   );
 }
 
+function CategoryModal({ token, categories, products, onClose, onChanged }) {
+  const [newCat, setNewCat] = useState("");
+  const [error, setError] = useState(null);
+
+  async function addCategory() {
+    const label = newCat.trim();
+    const key = slugify(label);
+    if (!label || !key) return;
+    if (categories.some((c) => c.key === key)) { setError("That category already exists."); return; }
+    setError(null);
+    const next = [...categories, { key, label }];
+    await api.putBoilerplate(token, "product_categories", next);
+    onChanged(next);
+    setNewCat("");
+  }
+
+  async function removeCategory(key) {
+    if (products.some((p) => p.category === key)) {
+      setError("Remove or reassign products in this category first.");
+      return;
+    }
+    if (!confirm("Remove this category?")) return;
+    setError(null);
+    const next = categories.filter((c) => c.key !== key);
+    await api.putBoilerplate(token, "product_categories", next);
+    onChanged(next);
+  }
+
+  return (
+    <div className="modal-overlay" onMouseDown={onClose}>
+      <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3>Manage Categories</h3>
+          <button type="button" className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div className="cat-add">
+            <input value={newCat} placeholder="New category name (e.g. Switch)" onChange={(e) => setNewCat(e.target.value)}
+                   onKeyDown={(e) => e.key === "Enter" && addCategory()} autoFocus />
+            <button onClick={addCategory}>Add</button>
+          </div>
+          {error && <p className="error">{error}</p>}
+          <div className="cat-chips">
+            {categories.map((c) => (
+              <span key={c.key} className="cat-chip">
+                {c.label} ({products.filter((p) => p.category === c.key).length})
+                <button title="Remove" onClick={() => removeCategory(c.key)}>×</button>
+              </span>
+            ))}
+            {categories.length === 0 && <p className="hint">No categories yet.</p>}
+          </div>
+        </div>
+        <div className="modal-foot">
+          <button type="button" className="ghost" onClick={onClose}>Done</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ProductsTab({ token }) {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState(FALLBACK_CATEGORIES);
-  const [activeCat, setActiveCat] = useState("panel");
+  const [filterCat, setFilterCat] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [modal, setModal] = useState(null); // null | initial-form-object
   const [manageCats, setManageCats] = useState(false);
-  const [newCat, setNewCat] = useState("");
 
   async function refresh() { setProducts(await api.listProductsAll()); }
   async function loadCats() {
@@ -172,28 +233,9 @@ function ProductsTab({ token }) {
 
   const labelOf = (key) => (categories.find((c) => c.key === key)?.label) || key;
 
-  async function addCategory() {
-    const label = newCat.trim();
-    const key = slugify(label);
-    if (!label || !key || categories.some((c) => c.key === key)) { setNewCat(""); return; }
-    const next = [...categories, { key, label }];
-    await api.putBoilerplate(token, "product_categories", next);
-    setCategories(next);
-    setNewCat("");
-  }
-  async function removeCategory(key) {
-    if (products.some((p) => p.category === key)) {
-      alert("Remove or reassign products in this category first.");
-      return;
-    }
-    if (!confirm("Remove this category?")) return;
-    const next = categories.filter((c) => c.key !== key);
-    await api.putBoilerplate(token, "product_categories", next);
-    setCategories(next);
-    if (activeCat === key) setActiveCat(next[0]?.key || "");
-  }
+  function runSearch() { setSearchQuery(searchInput.trim()); }
 
-  function openAdd() { setModal({ ...EMPTY_PRODUCT, category: activeCat || categories[0]?.key }); }
+  function openAdd() { setModal({ ...EMPTY_PRODUCT, category: filterCat || categories[0]?.key }); }
   function openEdit(p) {
     setModal({
       id: p.id,
@@ -214,41 +256,37 @@ function ProductsTab({ token }) {
     refresh();
   }
 
-  const rows = products.filter((p) => p.category === activeCat);
+  const q = searchQuery.toLowerCase();
+  const rows = products.filter((p) => {
+    if (filterCat && p.category !== filterCat) return false;
+    if (!q) return true;
+    return [p.brand, p.model_name, p.spec_title].some((v) => (v || "").toLowerCase().includes(q));
+  });
 
   return (
     <div className="admin-card catalog-card">
       <div className="catalog-head">
-        <div className="catalog-tabs">
-          {categories.map((c) => (
-            <button key={c.key} className={activeCat === c.key ? "active" : ""} onClick={() => setActiveCat(c.key)}>
-              {c.label} ({products.filter((p) => p.category === c.key).length})
-            </button>
-          ))}
+        <div className="catalog-filters">
+          <select value={filterCat} onChange={(e) => setFilterCat(e.target.value)}>
+            <option value="">All Categories</option>
+            {categories.map((c) => (
+              <option key={c.key} value={c.key}>{c.label} ({products.filter((p) => p.category === c.key).length})</option>
+            ))}
+          </select>
+          <input
+            className="catalog-search"
+            placeholder="Search brand, model, spec title…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && runSearch()}
+          />
+          <button className="ghost-btn" onClick={runSearch}>Search</button>
         </div>
         <div className="catalog-actions">
-          <button className="ghost-btn" onClick={() => setManageCats((v) => !v)}>Manage Categories</button>
+          <button className="ghost-btn" onClick={() => setManageCats(true)}>Manage Categories</button>
           <button className="add-product-btn" onClick={openAdd}>+ Add Product</button>
         </div>
       </div>
-
-      {manageCats && (
-        <div className="cat-manager">
-          <div className="cat-add">
-            <input value={newCat} placeholder="New category name (e.g. Switch)" onChange={(e) => setNewCat(e.target.value)}
-                   onKeyDown={(e) => e.key === "Enter" && addCategory()} />
-            <button onClick={addCategory}>Add</button>
-          </div>
-          <div className="cat-chips">
-            {categories.map((c) => (
-              <span key={c.key} className="cat-chip">
-                {c.label}
-                <button title="Remove" onClick={() => removeCategory(c.key)}>×</button>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
 
       <table className="catalog-table">
         <thead>
@@ -258,7 +296,7 @@ function ProductsTab({ token }) {
         </thead>
         <tbody>
           {rows.length === 0 && (
-            <tr><td colSpan={7} className="empty-row">No {labelOf(activeCat)} products yet. Click “Add Product”.</td></tr>
+            <tr><td colSpan={7} className="empty-row">No products match{filterCat ? ` in ${labelOf(filterCat)}` : ""}{q ? ` for "${searchQuery}"` : ""}.</td></tr>
           )}
           {rows.map((p) => (
             <tr key={p.id}>
@@ -284,6 +322,19 @@ function ProductsTab({ token }) {
           categories={categories}
           onClose={() => setModal(null)}
           onSaved={() => { setModal(null); refresh(); }}
+        />
+      )}
+
+      {manageCats && (
+        <CategoryModal
+          token={token}
+          categories={categories}
+          products={products}
+          onClose={() => setManageCats(false)}
+          onChanged={(next) => {
+            setCategories(next);
+            if (filterCat && !next.some((c) => c.key === filterCat)) setFilterCat("");
+          }}
         />
       )}
     </div>
