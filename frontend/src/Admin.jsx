@@ -833,13 +833,68 @@ function SettingsTab({ token }) {
 }
 
 const NAV = [
-  { key: "dashboard", label: "Dashboard", icon: "▦" },
-  { key: "products", label: "Products", icon: "▢" },
-  { key: "clients", label: "Clients", icon: "☺" },
-  { key: "proposals", label: "Proposals", icon: "▤" },
-  { key: "users", label: "Users", icon: "◈" },
-  { key: "settings", label: "Settings", icon: "⚙" },
+  { key: "dashboard", label: "Dashboard", icon: "dashboard" },
+  { key: "products", label: "Products", icon: "products" },
+  { key: "clients", label: "Clients", icon: "clients" },
+  { key: "proposals", label: "Proposals", icon: "proposals" },
+  { key: "users", label: "Users", icon: "users" },
+  { key: "settings", label: "Settings", icon: "settings" },
 ];
+
+const ICON_PATHS = {
+  dashboard: (
+    <>
+      <rect x="3" y="3" width="7" height="9" rx="1.5" />
+      <rect x="14" y="3" width="7" height="5" rx="1.5" />
+      <rect x="14" y="12" width="7" height="9" rx="1.5" />
+      <rect x="3" y="16" width="7" height="5" rx="1.5" />
+    </>
+  ),
+  products: (
+    <>
+      <path d="M3 7.5 12 3l9 4.5-9 4.5-9-4.5Z" />
+      <path d="M3 7.5V16l9 4.5 9-4.5V7.5" />
+      <path d="M12 12v8.5" />
+    </>
+  ),
+  clients: (
+    <>
+      <circle cx="9" cy="8" r="3.25" />
+      <path d="M2.75 20a6.25 6.25 0 0 1 12.5 0" />
+      <path d="M16 4.5a3.25 3.25 0 0 1 0 6.5" />
+      <path d="M15 14a6.2 6.2 0 0 1 6.25 6" />
+    </>
+  ),
+  proposals: (
+    <>
+      <path d="M6.5 2.75h8.25L19 7v13.25a1 1 0 0 1-1 1H6.5a1 1 0 0 1-1-1V3.75a1 1 0 0 1 1-1Z" />
+      <path d="M14.5 2.75V7H19" />
+      <path d="M8.25 12h7.5M8.25 15.5h7.5M8.25 8.5h3" />
+    </>
+  ),
+  users: (
+    <>
+      <circle cx="9" cy="7.5" r="3.25" />
+      <path d="M2.75 20a6.25 6.25 0 0 1 12.5 0" />
+      <path d="M18 8.5v4M20 10.5h-4" />
+      <path d="M15.5 20a5.2 5.2 0 0 1 5-3.75" />
+    </>
+  ),
+  settings: (
+    <>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2.75v2.4M12 18.85v2.4M4.93 4.93l1.7 1.7M17.37 17.37l1.7 1.7M2.75 12h2.4M18.85 12h2.4M4.93 19.07l1.7-1.7M17.37 6.63l1.7-1.7" />
+    </>
+  ),
+};
+
+function NavIcon({ name }) {
+  return (
+    <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      {ICON_PATHS[name]}
+    </svg>
+  );
+}
 
 const PAGE_TITLES = {
   dashboard: "Dashboard",
@@ -863,7 +918,7 @@ export default function Admin({ onEditClient, onExit, onLogout, currentEmail, us
         <nav className="sidebar-nav">
           {NAV.map((n) => (
             <button key={n.key} className={tab === n.key ? "active" : ""} onClick={() => setTab(n.key)}>
-              <span className="nav-icon">{n.icon}</span> {n.label}
+              <NavIcon name={n.icon} /> {n.label}
             </button>
           ))}
         </nav>
