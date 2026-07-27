@@ -288,6 +288,7 @@ function ProductsTab({ token }) {
         </div>
       </div>
 
+      <div className="table-scroll">
       <table className="catalog-table">
         <thead>
           <tr>
@@ -314,6 +315,7 @@ function ProductsTab({ token }) {
           ))}
         </tbody>
       </table>
+      </div>
 
       {modal && (
         <ProductModal
@@ -359,6 +361,7 @@ function ProposalsTab({ onEditClient }) {
   return (
     <div className="admin-card">
       <h3>Proposals & History ({projects.length})</h3>
+      <div className="table-scroll">
       <table className="clients-table">
         <thead>
           <tr><th>#</th><th>Client</th><th>Proposal Name</th><th>Site</th><th>Status</th><th>Updated</th><th>Actions</th></tr>
@@ -381,6 +384,7 @@ function ProposalsTab({ onEditClient }) {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
@@ -461,6 +465,7 @@ function ClientsTab() {
         <h3>Clients ({clients.length})</h3>
         <button className="add-product-btn" onClick={() => setModal(EMPTY_CLIENT)}>+ Add Client</button>
       </div>
+      <div className="table-scroll">
       <table className="clients-table">
         <thead>
           <tr><th>Name</th><th>Phone</th><th>Email</th><th>Organization</th><th>Proposals</th><th></th></tr>
@@ -482,9 +487,59 @@ function ClientsTab() {
           ))}
         </tbody>
       </table>
+      </div>
       {modal && (
         <ClientModal initial={modal} onClose={() => setModal(null)} onSaved={() => { setModal(null); refresh(); }} />
       )}
+    </div>
+  );
+}
+
+const LOG_ACTION_LABELS = {
+  login: "Logged in",
+  logout: "Logged out",
+  "client.create": "Created client",
+  "client.update": "Updated client",
+  "client.delete": "Deleted client",
+  "product.create": "Added product",
+  "product.update": "Updated product",
+  "product.delete": "Deleted product",
+  "user.create": "Created user",
+  "user.update": "Updated user",
+  "user.delete": "Deleted user",
+};
+
+function LogsTab() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.listLogs().then(setRows).finally(() => setLoading(false));
+  }, []);
+
+  return (
+    <div className="admin-card">
+      <div className="catalog-head">
+        <h3>System Logs {rows.length > 0 && `(${rows.length})`}</h3>
+      </div>
+      <div className="table-scroll">
+      <table className="clients-table">
+        <thead>
+          <tr><th>When</th><th>User</th><th>Action</th><th>Detail</th></tr>
+        </thead>
+        <tbody>
+          {!loading && rows.length === 0 && <tr><td colSpan={4} className="empty-row">No activity recorded yet.</td></tr>}
+          {rows.map((r) => (
+            <tr key={r.id}>
+              <td>{r.created_at ? new Date(r.created_at).toLocaleString() : "—"}</td>
+              <td>{r.actor_email || "—"}</td>
+              <td>{LOG_ACTION_LABELS[r.action] || r.action}</td>
+              <td>{r.detail || "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      </div>
     </div>
   );
 }
@@ -583,6 +638,7 @@ function UsersTab({ currentEmail }) {
         <h3>Staff & Admin Accounts ({users.length})</h3>
         <button className="add-product-btn" onClick={() => setModal(EMPTY_USER)}>+ Add User</button>
       </div>
+      <div className="table-scroll">
       <table className="clients-table">
         <thead>
           <tr><th>Email</th><th>Name</th><th>Role</th><th>Status</th><th>Last login</th><th></th></tr>
@@ -603,6 +659,7 @@ function UsersTab({ currentEmail }) {
           ))}
         </tbody>
       </table>
+      </div>
       {modal && (
         <UserModal initial={modal} onClose={() => setModal(null)} onSaved={() => { setModal(null); refresh(); }} />
       )}
@@ -723,6 +780,7 @@ function DashboardTab({ onGoTo }) {
         {recent.length === 0 ? (
           <p className="hint">No clients yet.</p>
         ) : (
+          <div className="table-scroll">
           <table className="clients-table">
             <thead><tr><th>#</th><th>Name</th><th>Site</th><th>Updated</th></tr></thead>
             <tbody>
@@ -734,6 +792,7 @@ function DashboardTab({ onGoTo }) {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>
@@ -838,6 +897,7 @@ const NAV = [
   { key: "clients", label: "Clients", icon: "clients" },
   { key: "proposals", label: "Proposals", icon: "proposals" },
   { key: "users", label: "Users", icon: "users" },
+  { key: "logs", label: "System Logs", icon: "logs" },
   { key: "settings", label: "Settings", icon: "settings" },
 ];
 
@@ -886,6 +946,18 @@ const ICON_PATHS = {
       <path d="M12 2.75v2.4M12 18.85v2.4M4.93 4.93l1.7 1.7M17.37 17.37l1.7 1.7M2.75 12h2.4M18.85 12h2.4M4.93 19.07l1.7-1.7M17.37 6.63l1.7-1.7" />
     </>
   ),
+  logs: (
+    <>
+      <path d="M5 3.75h11L20 8v12.25a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4.75a1 1 0 0 1 1-1Z" />
+      <path d="M16 3.75V8h4" />
+      <path d="M7.5 12h9M7.5 15.5h9M7.5 18.5h5.5" />
+    </>
+  ),
+  collapse: (
+    <>
+      <path d="M15 4.5 8 12l7 7.5" />
+    </>
+  ),
 };
 
 function NavIcon({ name }) {
@@ -902,28 +974,40 @@ const PAGE_TITLES = {
   clients: "Clients",
   proposals: "Proposals & History",
   users: "Staff & Admin Accounts",
+  logs: "System Logs",
   settings: "Settings",
 };
 
 export default function Admin({ onEditClient, onExit, onLogout, currentEmail, userName }) {
   const [tab, setTab] = useState("dashboard");
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
     <div className="admin-shell">
-      <aside className="admin-sidebar">
+      <aside className={`admin-sidebar${collapsed ? " collapsed" : ""}`}>
         <div className="sidebar-brand">
           <img src="/zarni-logo.png" alt="Zarni" />
           <span>Zarni Admin</span>
+          <button className="sidebar-collapse-btn" title="Collapse sidebar" onClick={() => setCollapsed(true)}>
+            <NavIcon name="collapse" />
+          </button>
         </div>
+        {collapsed && (
+          <button className="sidebar-collapse-btn" style={{ marginBottom: "0.75rem" }} title="Expand sidebar" onClick={() => setCollapsed(false)}>
+            <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 4.5 16 12l-7 7.5" />
+            </svg>
+          </button>
+        )}
         <nav className="sidebar-nav">
           {NAV.map((n) => (
-            <button key={n.key} className={tab === n.key ? "active" : ""} onClick={() => setTab(n.key)}>
-              <NavIcon name={n.icon} /> {n.label}
+            <button key={n.key} className={tab === n.key ? "active" : ""} onClick={() => setTab(n.key)} title={n.label}>
+              <NavIcon name={n.icon} /> <span>{n.label}</span>
             </button>
           ))}
         </nav>
         <div className="sidebar-foot">
-          <button className="sidebar-link" onClick={onExit}>← Proposal Form</button>
+          <button className="sidebar-link" onClick={onExit} title="Proposal Form"><span>← Proposal Form</span></button>
         </div>
       </aside>
 
@@ -941,6 +1025,7 @@ export default function Admin({ onEditClient, onExit, onLogout, currentEmail, us
           {tab === "clients" && <ClientsTab />}
           {tab === "proposals" && <ProposalsTab onEditClient={onEditClient} />}
           {tab === "users" && <UsersTab currentEmail={currentEmail} />}
+          {tab === "logs" && <LogsTab />}
           {tab === "settings" && <SettingsTab />}
         </div>
       </main>

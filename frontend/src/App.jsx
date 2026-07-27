@@ -413,6 +413,9 @@ function ProposalForm({ initialProject, onExitToPicker }) {
   const isReview = step === SECTIONS.length;
   const currentTitle = isReview ? "Review & Export" : section.title;
   const pct = Math.round(((step + 1) / totalSteps) * 100);
+  const remainingTitles = isReview
+    ? []
+    : SECTIONS.slice(step + 1).map((s) => s.title).concat(["Review & Export"]);
 
   return (
     <div className="app">
@@ -431,6 +434,14 @@ function ProposalForm({ initialProject, onExitToPicker }) {
         <div className="wizard-progress-bar">
           <div className="wizard-progress-fill" style={{ width: `${pct}%` }} />
         </div>
+        {remainingTitles.length > 0 && (
+          <div className="wizard-remaining">
+            <span className="wizard-remaining-count">
+              {remainingTitles.length} step{remainingTitles.length === 1 ? "" : "s"} left:
+            </span>
+            <span className="wizard-remaining-list">{remainingTitles.join(" · ")}</span>
+          </div>
+        )}
         <select className="wizard-jump" value={step} onChange={(e) => setStep(Number(e.target.value))}>
           {SECTIONS.map((s, i) => (
             <option key={s.key} value={i}>{i + 1}. {s.title}</option>
@@ -590,7 +601,7 @@ export default function App() {
   }, []);
 
   function logout() {
-    signOut(auth);
+    api.logout().catch(() => {}).finally(() => signOut(auth));
     setUser(null);
     setAuthState("out");
     setActiveProject(null);

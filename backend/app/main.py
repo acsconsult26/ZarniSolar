@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import firebase  # noqa: F401  -- side effect: initializes the Firebase Admin SDK
-from .routers import projects, admin, products, users, clients
+from .routers import projects, admin, products, users, clients, logs
 from .auth import ensure_seed_admin
 
 ensure_seed_admin()
@@ -21,6 +21,7 @@ app.include_router(admin.router)
 app.include_router(products.router)
 app.include_router(users.router)
 app.include_router(clients.router)
+app.include_router(logs.router)
 
 
 @app.get("/health")

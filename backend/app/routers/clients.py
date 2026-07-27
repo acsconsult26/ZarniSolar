@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from .. import firestore_db as fdb
+from .. import activity_log
 from ..auth import get_current_user
 
 router = APIRouter(prefix="/clients", tags=["clients"])
@@ -37,7 +38,7 @@ def get_client(client_id: str):
 
 
 @router.post("", dependencies=[Depends(get_current_user)])
-def create_client(body: dict):
+def create_client(body: dict, user=Depends(get_current_user)):
     name = (body.get("name") or "").strip()
     if not name:
         raise HTTPException(400, "name is required")
@@ -49,24 +50,27 @@ def create_client(body: dict):
         "address": body.get("address"),
         "notes": body.get("notes"),
     })
+    activity_log.log(user, "client.create", target=client["id"], detail=name)
     return _serialize(client)
 
 
 @router.put("/{client_id}", dependencies=[Depends(get_current_user)])
-def update_client(client_id: str, body: dict):
+def update_client(client_id: str, body: dict, user=Depends(get_current_user)):
     patch = {k: body[k] for k in ("name", "phone", "email", "organization", "address", "notes") if k in body}
     client = fdb.update("clients", client_id, patch)
     if not client:
         raise HTTPException(404, "Client not found")
+    activity_log.log(user, "client.update", target=client_id, detail=client.get("name"))
     return _serialize(client)
 
 
 @router.delete("/{client_id}", dependencies=[Depends(get_current_user)])
-def delete_client(client_id: str):
+def delete_client(client_id: str, user=Depends(get_current_user)):
     client = fdb.get("clients", client_id)
     if not client:
         raise HTTPException(404, "Client not found")
     if fdb.count_projects_for_client(client_id) > 0:
         raise HTTPException(409, "Cannot delete a client with existing projects")
     fdb.delete("clients", client_id)
+    activity_log.log(user, "client.delete", target=client_id, detail=client.get("name"))
     return {"ok": True}

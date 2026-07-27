@@ -4,6 +4,7 @@ import datetime
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Body
 
 from .. import firestore_db as fdb
+from .. import activity_log
 from ..storage import storage
 from ..auth import require_admin, get_current_user
 from ..boilerplate import BOILERPLATE_DEFAULTS, EDITABLE_KEYS, get_or_seed, write as write_boilerplate
@@ -13,8 +14,20 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 @router.get("/me")
 def me(user=Depends(get_current_user)):
+    was_new_login = user.get("last_login_at") is None or (
+        (datetime.datetime.utcnow() - user["last_login_at"]).total_seconds() > 60 * 30
+        if isinstance(user.get("last_login_at"), datetime.datetime) else True
+    )
     fdb.update("users", user["uid"], {"last_login_at": datetime.datetime.utcnow()})
+    if was_new_login:
+        activity_log.log(user, "login")
     return {"authenticated": True, "email": user.get("email"), "name": user.get("name"), "role": user.get("role")}
+
+
+@router.post("/logout")
+def logout(user=Depends(get_current_user)):
+    activity_log.log(user, "logout")
+    return {"ok": True}
 
 
 @router.get("/boilerplate/{key}")

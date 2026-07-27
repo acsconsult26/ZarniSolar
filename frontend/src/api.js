@@ -109,6 +109,10 @@ export const api = {
 
   // ---- auth ----
   me: () => fetch(`${API_BASE}/admin/me`, { headers: authHeaders() }).then(json),
+  logout: () => fetch(`${API_BASE}/admin/logout`, { method: "POST", headers: authHeaders() }).then(json),
+
+  // ---- system logs ----
+  listLogs: () => fetch(`${API_BASE}/admin/logs`, { headers: authHeaders() }).then(json),
 
   // ---- clients ----
   listClients: () => fetch(`${API_BASE}/clients`, { headers: authHeaders() }).then(json),

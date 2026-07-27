@@ -5,6 +5,7 @@ from firebase_admin import auth as fb_auth
 from firebase_admin.auth import EmailAlreadyExistsError
 
 from .. import firestore_db as fdb
+from .. import activity_log
 from ..auth import require_admin
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -28,7 +29,7 @@ def list_users():
 
 
 @router.post("", dependencies=[Depends(require_admin)])
-def create_user(body: dict):
+def create_user(body: dict, current=Depends(require_admin)):
     email = (body.get("email") or "").strip().lower()
     password = body.get("password") or ""
     if not email or not password:
@@ -50,11 +51,12 @@ def create_user(body: dict):
         "created_at": datetime.datetime.utcnow(),
         "last_login_at": None,
     })
+    activity_log.log(current, "user.create", target=auth_user.uid, detail=email)
     return _serialize(profile)
 
 
 @router.put("/{user_id}", dependencies=[Depends(require_admin)])
-def update_user(user_id: str, body: dict):
+def update_user(user_id: str, body: dict, current=Depends(require_admin)):
     if not fdb.get("users", user_id):
         raise HTTPException(404, "User not found")
     patch = {}
@@ -71,6 +73,7 @@ def update_user(user_id: str, body: dict):
             raise HTTPException(400, "password must be at least 8 characters")
         fb_auth.update_user(user_id, password=body["password"])
     profile = fdb.update("users", user_id, patch) if patch else fdb.get("users", user_id)
+    activity_log.log(current, "user.update", target=user_id, detail=profile.get("email"))
     return _serialize(profile)
 
 
@@ -78,11 +81,13 @@ def update_user(user_id: str, body: dict):
 def delete_user(user_id: str, current=Depends(require_admin)):
     if user_id == current["uid"]:
         raise HTTPException(400, "Cannot delete your own account")
-    if not fdb.get("users", user_id):
+    profile = fdb.get("users", user_id)
+    if not profile:
         raise HTTPException(404, "User not found")
     try:
         fb_auth.delete_user(user_id)
     except fb_auth.UserNotFoundError:
         pass
     fdb.delete("users", user_id)
+    activity_log.log(current, "user.delete", target=user_id, detail=profile.get("email"))
     return {"ok": True}

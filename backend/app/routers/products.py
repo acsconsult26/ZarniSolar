@@ -5,6 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 
 from .. import firestore_db as fdb
+from .. import activity_log
 from ..storage import storage
 from ..auth import require_admin
 from .. import boilerplate as bp
@@ -61,7 +62,7 @@ def list_products(category: Optional[str] = None):
 
 
 @router.post("", dependencies=[Depends(require_admin)])
-def create_product(body: dict):
+def create_product(body: dict, user=Depends(require_admin)):
     category = (body.get("category") or "").strip()
     if category not in _allowed_categories():
         raise HTTPException(400, f"Unknown category '{category}'. Add it in Admin first.")
@@ -76,11 +77,12 @@ def create_product(body: dict):
         "warranty_line": body.get("warranty_line"),
         "image_path": None,
     })
+    activity_log.log(user, "product.create", target=p["id"], detail=f"{p.get('brand')} {p.get('model_name')}".strip())
     return _serialize(p)
 
 
 @router.put("/{product_id}", dependencies=[Depends(require_admin)])
-def update_product(product_id: str, body: dict):
+def update_product(product_id: str, body: dict, user=Depends(require_admin)):
     patch = {}
     for field in ("brand", "model_name", "unit_value", "unit_label", "spec_title", "warranty_line"):
         if field in body:
@@ -92,14 +94,17 @@ def update_product(product_id: str, body: dict):
     p = fdb.update("products", product_id, patch)
     if not p:
         raise HTTPException(404, "Product not found")
+    activity_log.log(user, "product.update", target=product_id, detail=f"{p.get('brand')} {p.get('model_name')}".strip())
     return _serialize(p)
 
 
 @router.delete("/{product_id}", dependencies=[Depends(require_admin)])
-def delete_product(product_id: str):
-    if not fdb.get("products", product_id):
+def delete_product(product_id: str, user=Depends(require_admin)):
+    p = fdb.get("products", product_id)
+    if not p:
         raise HTTPException(404, "Product not found")
     fdb.delete("products", product_id)
+    activity_log.log(user, "product.delete", target=product_id, detail=f"{p.get('brand')} {p.get('model_name')}".strip())
     return {"ok": True}
 
 
