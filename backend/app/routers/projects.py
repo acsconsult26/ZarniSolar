@@ -30,7 +30,7 @@ def _gather_selected_products(data: dict) -> dict:
     """Build {category: product_dict} from the *_product_id values stored on
     the project, for the spec-table slides (14-16) and warranty (22)."""
     selected = {}
-    for category in ("inverter", "battery", "panel"):
+    for category in ("inverter", "battery", "panel", "gateway"):
         pid = data.get(f"{category}_product_id")
         if not pid:
             continue
@@ -61,7 +61,9 @@ def _serialize(p: dict) -> dict:
         "name": p.get("name"),
         "status": p.get("status", "draft"),
         "data": p.get("data") or {},
-        "uploads": p.get("uploads") or {},
+        "uploads": {
+            field: storage.url_for(path) for field, path in (p.get("uploads") or {}).items() if storage.exists(path)
+        },
         "computed": merged_field_values(p.get("data") or {}),
         "slide19_image_url": storage.url_for(p["slide19_image_path"]) if storage.exists(p.get("slide19_image_path")) else None,
         "export_count": p.get("export_count", 0),

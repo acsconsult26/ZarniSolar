@@ -5,6 +5,7 @@ const FALLBACK_CATEGORIES = [
   { key: "panel", label: "Solar Panel" },
   { key: "inverter", label: "Inverter" },
   { key: "battery", label: "Battery" },
+  { key: "gateway", label: "Gateway" },
 ];
 
 function slugify(s) {
@@ -47,6 +48,15 @@ const SPEC_FIELDS = {
     { label: "Module Efficiency", unit: "%" },
     { label: "Weight", unit: "kg" },
     { label: "Dimension (W x H x Thickness)", unit: "mm" },
+  ],
+  gateway: [
+    { label: "Model", unit: "" },
+    { label: "Rated Power", unit: "W" },
+    { label: "Communication Interface", unit: "" },
+    { label: "Supported Protocols", unit: "" },
+    { label: "Operating Temperature", unit: "°C" },
+    { label: "Dimensions (W/H/D)", unit: "mm" },
+    { label: "Weight", unit: "kg" },
   ],
 };
 

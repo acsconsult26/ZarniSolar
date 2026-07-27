@@ -4,8 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import firebase  # noqa: F401  -- side effect: initializes the Firebase Admin SDK
 from .routers import projects, admin, products, users, clients, logs
 from .auth import ensure_seed_admin
+from . import boilerplate as bp
 
 ensure_seed_admin()
+bp.ensure_category("gateway", "Gateway")
 
 app = FastAPI(title="Solar ESS Proposal Generator")
 

@@ -4,6 +4,18 @@ Running log of notable changes for AI tooling/session continuity. Newest entries
 
 ---
 
+## 2026-07-27 — Proposal form bug fixes: rich text, image uploads, date pickers, gateway product, east view
+
+- **Rich text editor broken** (`frontend/src/RichText.jsx`, `App.jsx`): the contentEditable box was wrapped in a `<label>` with no associated form control, which silently ate the click-to-focus in Chrome — typing/bold/italic did nothing. Fixed by using a `<div>` wrapper. Also replaced the deprecated/unreliable `document.execCommand` formatting calls with manual Range/DOM wrapping (`<strong>`/`<em>`/`<u>` + manual list insertion) since execCommand didn't reliably apply formatting.
+- **Uploaded images not showing + broken storage URLs** (root cause of both bugs, and of the `ERR_NAME_NOT_RESOLVED` console error): `api.fileUrl()` unconditionally prepended the Cloud Run API base to whatever path it got, but `storage.url_for()` already returns a full Firebase Storage URL — double-prefixing produced malformed URLs like `...run.apphttps//firebasestorage...`. Fixed `api.fileUrl` to pass through absolute URLs unchanged, and fixed the backend's project `_serialize()` (`backend/app/routers/projects.py`) to resolve `uploads` paths to full URLs consistently with the fresh-upload response.
+- **Image compression** (`backend/app/storage.py`): uploads are now downscaled (max 1920px) and re-encoded as JPEG (or PNG if they have real transparency) via Pillow before saving to Firebase Storage, with `content_type` set correctly.
+- **Proposal Date** is now a native date picker (`frontend/src/fields.js`).
+- **Power Analyzer date range** (step 9 / slide 10): replaced the free-text field with a proper from/to date-range picker (`daterange` field type, `DateRangeField` component in `App.jsx`).
+- **System Options UI overflow** (step 11 / slides 13-14): item rows (product select, name, qty, unit) were overflowing option cards after the 2nd item. Redesigned into two stacked rows per item with flexible/min-width-0 children so it can't overflow regardless of card width.
+- **EPC units / unit cost auto-fill**: Total EPC Units and the derived per-unit cost from the Electricity Bill step now auto-populate the ROI and Payback steps' equivalent fields (only when those fields are still empty), so the same numbers don't need retyping.
+- **East View** added alongside West/South View throughout the Simulation & Shade Reports section (slide 20 image, new shade-report slide, `fields.js` + `pptx_export_v2.py`).
+- **Gateway product** added as a 4th product-select field (alongside Inverter/Solar/Battery) on the Product Specifications step, plus a new "Gateway" product category wired through `boilerplate.py` (with a migration helper `ensure_category()` for already-seeded Firestore docs), `Admin.jsx` category list + spec fields, and a new gateway spec slide in `pptx_export_v2.py`.
+
 ## 2026-07-27 — Proposal wizard step indicator, admin sidebar collapse, system logs, responsive pass
 
 - **Proposal form**: wizard progress bar now shows "N steps left: Section A · Section B · ..." listing remaining section titles (`frontend/src/App.jsx`).

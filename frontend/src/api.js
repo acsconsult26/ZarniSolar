@@ -102,7 +102,12 @@ export const api = {
     window.URL.revokeObjectURL(url);
   },
 
-  fileUrl: (path) => (path ? `${API_BASE}${path}` : null),
+  // storage.url_for() on the backend already returns a full Firebase Storage
+  // URL -- only relative paths need the API_BASE prefix.
+  fileUrl: (path) => {
+    if (!path) return null;
+    return /^https?:\/\//i.test(path) ? path : `${API_BASE}${path}`;
+  },
 
   deleteProject: (id) =>
     fetch(`${API_BASE}/projects/${id}`, { method: "DELETE", headers: authHeaders() }).then(json),

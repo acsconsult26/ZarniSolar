@@ -38,6 +38,7 @@ BOILERPLATE_DEFAULTS = {
         {"key": "panel", "label": "Solar Panel"},
         {"key": "inverter", "label": "Inverter"},
         {"key": "battery", "label": "Battery"},
+        {"key": "gateway", "label": "Gateway"},
         {"key": "base_main", "label": "Base Main"},
         {"key": "base_sub", "label": "Base SUB"},
         {"key": "battery_controller", "label": "Battery Controller (BC)"},
@@ -79,3 +80,13 @@ def read(key: str):
 def write(key: str, value):
     _doc_ref(key).set({"value": value})
     return value
+
+
+def ensure_category(key: str, label: str) -> None:
+    """Adds a product category to an already-seeded `product_categories` doc
+    if missing -- BOILERPLATE_DEFAULTS only applies on first-ever read, so a
+    live deployment needs this to pick up newly added categories."""
+    categories = get_or_seed("product_categories") or []
+    if any(c.get("key") == key for c in categories):
+        return
+    write("product_categories", categories + [{"key": key, "label": label}])

@@ -6,7 +6,7 @@ export const SECTIONS = [
     title: "Cover (Slide 1)",
     fields: [
       { name: "site_name", label: "Client Name", help: "ဖောက်သည် အမည်။ ဥပမာ — MRTV Sagaing", type: "text", required: true },
-      { name: "proposal_date", label: "Proposal Date", help: "Proposal ရက်စွဲ။ ဥပမာ — 26.Jun.2026", type: "text" },
+      { name: "proposal_date", label: "Proposal Date", help: "Proposal ရက်စွဲ", type: "date" },
     ],
     note: "Contact number is set in Admin → Settings.",
   },
@@ -84,7 +84,7 @@ export const SECTIONS = [
     key: "analyzer",
     title: "Power Analyzer (Slide 10)",
     fields: [
-      { name: "analyzer_date_range", label: "Date Range (subtitle)", help: "ဥပမာ — 22.Jun.26 – 24.Jun.26", type: "text" },
+      { name: "analyzer_date_range", label: "Date Range (subtitle)", help: "Pick the survey start and end dates", type: "daterange" },
     ],
     images: [{ name: "analyzer_image", label: "Power Analyzer Image" }],
   },
@@ -158,10 +158,12 @@ export const SIMULATION_SECTION = {
   fields: [
     { name: "west_shade_perfect", label: "West View Shade — Perfect Match (Slide 23)", type: "checkbox" },
     { name: "south_shade_perfect", label: "South View Shade — Perfect Match (Slide 24)", type: "checkbox" },
+    { name: "east_shade_perfect", label: "East View Shade — Perfect Match (Slide 24b)", type: "checkbox" },
   ],
   images: [
     { name: "sim_south_view", label: "Simulation — South View (Slide 20)" },
     { name: "sim_west_view", label: "Simulation — West View (Slide 20)" },
+    { name: "sim_east_view", label: "Simulation — East View (Slide 20)" },
     { name: "sim_pv_array", label: "Simulation — PV Array (Slide 20)" },
     { name: "energy_yield_1", label: "Energy Yield Report — Photo 1 (Slide 21)" },
     { name: "energy_yield_2", label: "Energy Yield Report — Photo 2 (Slide 21)" },
@@ -170,6 +172,8 @@ export const SIMULATION_SECTION = {
     { name: "west_shade_2", label: "West Shade — Photo 2 (Slide 23)" },
     { name: "south_shade_1", label: "South Shade — Photo 1 (Slide 24)" },
     { name: "south_shade_2", label: "South Shade — Photo 2 (Slide 24)" },
+    { name: "east_shade_1", label: "East Shade — Photo 1 (Slide 24b)" },
+    { name: "east_shade_2", label: "East Shade — Photo 2 (Slide 24b)" },
   ],
 };
 SECTIONS.push(SIMULATION_SECTION);
@@ -177,11 +181,12 @@ SECTIONS.push(SIMULATION_SECTION);
 export const PRODUCT_SPEC_SECTION = {
   key: "product_specs",
   title: "Product Specifications (Slides 26-28)",
-  note: "Pick the exact catalog product used for this proposal. Its spec table + image show on slides 26 (Solar), 27 (Battery), 28 (Inverter). Leave blank to skip a slide.",
+  note: "Pick the exact catalog product used for this proposal. Its spec table + image show on slides 26 (Solar), 27 (Battery), 28 (Inverter), 29 (Gateway). Leave blank to skip a slide.",
   fields: [
     { name: "panel_product_id", label: "Solar Panel (Slide 26)", type: "product-select", category: "panel" },
     { name: "battery_product_id", label: "Battery (Slide 27)", type: "product-select", category: "battery" },
     { name: "inverter_product_id", label: "Inverter (Slide 28)", type: "product-select", category: "inverter" },
+    { name: "gateway_product_id", label: "Gateway (Slide 29)", type: "product-select", category: "gateway" },
   ],
 };
 SECTIONS.push(PRODUCT_SPEC_SECTION);

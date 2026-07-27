@@ -123,12 +123,12 @@ def export_project_v2(project, storage, company_info=None, selected_products=Non
         _slide_single_image(prs, "Solar System Block Diagram", imgs.get("block_diagram_image"),
                             company_name, page)
 
-    # Slide 20 : Simulation Result (South View, West View, PV Array)
-    sim_imgs = [imgs.get("sim_south_view"), imgs.get("sim_west_view"), imgs.get("sim_pv_array")]
+    # Slide 20 : Simulation Result (South View, West View, East View, PV Array)
+    sim_imgs = [imgs.get("sim_south_view"), imgs.get("sim_west_view"), imgs.get("sim_east_view"), imgs.get("sim_pv_array")]
     if any(sim_imgs):
         page = len(prs.slides._sldIdLst) + 1
         _slide_photo_row(prs, "Simulation Result", sim_imgs, company_name, page,
-                         labels=["South View", "West View", "PV Array"])
+                         labels=["South View", "West View", "East View", "PV Array"])
 
     # Slide 21 : Energy Yield Report (2 photos side by side)
     eyr_imgs = [imgs.get("energy_yield_1"), imgs.get("energy_yield_2")]
@@ -156,6 +156,13 @@ def export_project_v2(project, storage, company_info=None, selected_products=Non
         title = "South View Shade Report" + (" (Perfect)" if data.get("south_shade_perfect") else "")
         _slide_photo_row(prs, title, south_imgs, company_name, page)
 
+    # Slide 24b : East View Shade Report (Perfect?) - 2 photos
+    east_imgs = [imgs.get("east_shade_1"), imgs.get("east_shade_2")]
+    if any(east_imgs):
+        page = len(prs.slides._sldIdLst) + 1
+        title = "East View Shade Report" + (" (Perfect)" if data.get("east_shade_perfect") else "")
+        _slide_photo_row(prs, title, east_imgs, company_name, page)
+
     # Slide 25 : fixed FYI info about Zarni Electronics Service (admin-editable)
     if closing_statement:
         page = len(prs.slides._sldIdLst) + 1
@@ -164,7 +171,8 @@ def export_project_v2(project, storage, company_info=None, selected_products=Non
     # Slides 26-28 : selected product specifications (Solar, Battery, Inverter)
     for category, title in (("panel", "Solar Panel Specification"),
                             ("battery", "Battery Specification"),
-                            ("inverter", "Inverter Specification")):
+                            ("inverter", "Inverter Specification"),
+                            ("gateway", "Gateway Specification")):
         product = (selected_products or {}).get(category)
         if product:
             page = len(prs.slides._sldIdLst) + 1

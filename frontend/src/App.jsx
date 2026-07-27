@@ -33,12 +33,15 @@ function Field({ field, value, onChange }) {
   }
   if (field.type === "richtext") {
     return (
-      <label className="field field-wide">
+      <div className="field field-wide">
         <span className="field-label">{field.label}{field.required ? " *" : ""}</span>
         {field.help && <small className="field-help">{field.help}</small>}
         <RichText value={value} onChange={(html) => onChange(field.name, html)} placeholder={field.help} />
-      </label>
+      </div>
     );
+  }
+  if (field.type === "daterange") {
+    return <DateRangeField field={field} value={value} onChange={onChange} />;
   }
   if (field.type === "checkbox") {
     return (
@@ -63,6 +66,34 @@ function Field({ field, value, onChange }) {
       {field.help && <small className="field-help">{field.help}</small>}
       <input type={field.type} value={value ?? ""} onChange={(e) => onChange(field.name, e.target.value)} />
     </label>
+  );
+}
+
+function formatDateShort(iso) {
+  if (!iso) return "";
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }).replace(/ /g, ".");
+}
+
+function DateRangeField({ field, value, onChange }) {
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+
+  function emit(nextFrom, nextTo) {
+    onChange(field.name, [formatDateShort(nextFrom), formatDateShort(nextTo)].filter(Boolean).join(" – "));
+  }
+
+  return (
+    <div className="field">
+      <span className="field-label">{field.label}{field.required ? " *" : ""}</span>
+      {field.help && <small className="field-help">{field.help}</small>}
+      <div className="daterange-row">
+        <input type="date" value={from} onChange={(e) => { setFrom(e.target.value); emit(e.target.value, to); }} />
+        <span>to</span>
+        <input type="date" value={to} onChange={(e) => { setTo(e.target.value); emit(from, e.target.value); }} />
+      </div>
+      {value && <small className="field-help">{value}</small>}
+    </div>
   );
 }
 
@@ -191,19 +222,23 @@ function SystemOptions({ data, setField }) {
             </div>
             {(o.items || []).map((it, j) => (
               <div key={j} className="option-item">
-                <select value="" onChange={(e) => { pickProduct(i, j, e.target.value); e.target.value = ""; }}>
-                  <option value="">{it.name ? "↺ change product" : "Pick product…"}</option>
-                  {catalog.map((p) => (
-                    <option key={p.id} value={p.id}>{p.brand} {p.model_name}</option>
-                  ))}
-                </select>
-                <input className="item-name" value={it.name || ""} placeholder="item name"
-                       onChange={(e) => setItem(i, j, { name: e.target.value })} />
-                <input className="item-qty" type="number" value={it.qty ?? ""} placeholder="qty"
-                       onChange={(e) => setItem(i, j, { qty: e.target.value })} />
-                <input className="item-unit" value={it.unit || ""} placeholder="unit"
-                       onChange={(e) => setItem(i, j, { unit: e.target.value })} />
-                <button className="remove-x" onClick={() => removeItem(i, j)}>×</button>
+                <div className="option-item-row">
+                  <select value="" onChange={(e) => { pickProduct(i, j, e.target.value); e.target.value = ""; }}>
+                    <option value="">{it.name ? "↺ change product" : "Pick product…"}</option>
+                    {catalog.map((p) => (
+                      <option key={p.id} value={p.id}>{p.brand} {p.model_name}</option>
+                    ))}
+                  </select>
+                  <button type="button" className="remove-x" onClick={() => removeItem(i, j)}>×</button>
+                </div>
+                <div className="option-item-row">
+                  <input className="item-name" value={it.name || ""} placeholder="item name"
+                         onChange={(e) => setItem(i, j, { name: e.target.value })} />
+                  <input className="item-qty" type="number" value={it.qty ?? ""} placeholder="qty"
+                         onChange={(e) => setItem(i, j, { qty: e.target.value })} />
+                  <input className="item-unit" value={it.unit || ""} placeholder="unit"
+                         onChange={(e) => setItem(i, j, { unit: e.target.value })} />
+                </div>
               </div>
             ))}
             <button className="add-item-btn" onClick={() => addItem(i)}>+ Add item</button>
@@ -382,6 +417,27 @@ function ProposalForm({ initialProject, onExitToPicker }) {
   function setField(fieldName, value) {
     setData((d) => ({ ...d, [fieldName]: value }));
   }
+
+  // Carry the Electricity Bill numbers (total EPC units + derived unit cost)
+  // into the ROI / Payback steps as defaults, so the same figures don't need
+  // to be retyped -- only fills fields the user hasn't already set.
+  useEffect(() => {
+    const unitCost = perUnitCost(data);
+    setData((d) => {
+      const patch = {};
+      if ((d.roi_total_epc_units === undefined || d.roi_total_epc_units === "") && d.total_epc_units) {
+        patch.roi_total_epc_units = d.total_epc_units;
+      }
+      if ((d.roi_avg_unit_cost === undefined || d.roi_avg_unit_cost === "") && unitCost) {
+        patch.roi_avg_unit_cost = unitCost;
+      }
+      if ((d.payback_unit_cost === undefined || d.payback_unit_cost === "") && unitCost) {
+        patch.payback_unit_cost = unitCost;
+      }
+      return Object.keys(patch).length ? { ...d, ...patch } : d;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.total_epc_units, data.total_epc_cost]);
 
   async function saveDraft() {
     if (!projectId) return;
