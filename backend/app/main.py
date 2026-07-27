@@ -1,21 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
-from .db import Base, engine, SessionLocal
+from . import firebase  # noqa: F401  -- side effect: initializes the Firebase Admin SDK
 from .routers import projects, admin, products, users, clients
-from .storage import UPLOAD_DIR
 from .auth import ensure_seed_admin
-from .migrations import auto_migrate
 
-Base.metadata.create_all(bind=engine)
-auto_migrate(engine, Base)
-
-_db = SessionLocal()
-try:
-    ensure_seed_admin(_db)
-finally:
-    _db.close()
+ensure_seed_admin()
 
 app = FastAPI(title="Solar ESS Proposal Generator")
 
@@ -25,8 +15,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 app.include_router(projects.router)
 app.include_router(admin.router)

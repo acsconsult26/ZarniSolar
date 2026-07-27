@@ -1,79 +1,88 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+import datetime
 
-from ..db import get_db
-from ..models import User
-from ..auth import require_admin, get_current_user, hash_password
+from fastapi import APIRouter, Depends, HTTPException
+from firebase_admin import auth as fb_auth
+from firebase_admin.auth import EmailAlreadyExistsError
+
+from .. import firestore_db as fdb
+from ..auth import require_admin
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-def _serialize(u: User) -> dict:
+def _serialize(u: dict) -> dict:
     return {
-        "id": u.id,
-        "email": u.email,
-        "name": u.name,
-        "role": u.role,
-        "is_active": u.is_active,
-        "created_at": u.created_at.isoformat() if u.created_at else None,
-        "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
+        "id": u["id"],
+        "email": u.get("email"),
+        "name": u.get("name"),
+        "role": u.get("role"),
+        "is_active": u.get("is_active", True),
+        "created_at": u["created_at"].isoformat() if u.get("created_at") else None,
+        "last_login_at": u["last_login_at"].isoformat() if u.get("last_login_at") else None,
     }
 
 
 @router.get("", dependencies=[Depends(require_admin)])
-def list_users(db: Session = Depends(get_db)):
-    return [_serialize(u) for u in db.query(User).order_by(User.created_at).all()]
+def list_users():
+    return [_serialize(u) for u in fdb.list_all("users", order_by="created_at")]
 
 
 @router.post("", dependencies=[Depends(require_admin)])
-def create_user(body: dict, db: Session = Depends(get_db)):
+def create_user(body: dict):
     email = (body.get("email") or "").strip().lower()
     password = body.get("password") or ""
     if not email or not password:
         raise HTTPException(400, "email and password are required")
     if len(password) < 8:
         raise HTTPException(400, "password must be at least 8 characters")
-    if db.query(User).filter(User.email == email).first():
-        raise HTTPException(409, "A user with this email already exists")
     role = body.get("role") or "staff"
     if role not in ("admin", "staff"):
         raise HTTPException(400, "role must be 'admin' or 'staff'")
-    user = User(email=email, password_hash=hash_password(password), name=body.get("name", ""), role=role)
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return _serialize(user)
+    try:
+        auth_user = fb_auth.create_user(email=email, password=password, display_name=body.get("name", ""))
+    except EmailAlreadyExistsError:
+        raise HTTPException(409, "A user with this email already exists")
+    profile = fdb.set_doc("users", auth_user.uid, {
+        "email": email,
+        "name": body.get("name", ""),
+        "role": role,
+        "is_active": True,
+        "created_at": datetime.datetime.utcnow(),
+        "last_login_at": None,
+    })
+    return _serialize(profile)
 
 
 @router.put("/{user_id}", dependencies=[Depends(require_admin)])
-def update_user(user_id: int, body: dict, db: Session = Depends(get_db)):
-    user = db.query(User).get(user_id)
-    if not user:
+def update_user(user_id: str, body: dict):
+    if not fdb.get("users", user_id):
         raise HTTPException(404, "User not found")
+    patch = {}
     if "name" in body:
-        user.name = body["name"]
+        patch["name"] = body["name"]
     if "role" in body:
         if body["role"] not in ("admin", "staff"):
             raise HTTPException(400, "role must be 'admin' or 'staff'")
-        user.role = body["role"]
+        patch["role"] = body["role"]
     if "is_active" in body:
-        user.is_active = bool(body["is_active"])
+        patch["is_active"] = bool(body["is_active"])
     if body.get("password"):
         if len(body["password"]) < 8:
             raise HTTPException(400, "password must be at least 8 characters")
-        user.password_hash = hash_password(body["password"])
-    db.commit()
-    db.refresh(user)
-    return _serialize(user)
+        fb_auth.update_user(user_id, password=body["password"])
+    profile = fdb.update("users", user_id, patch) if patch else fdb.get("users", user_id)
+    return _serialize(profile)
 
 
 @router.delete("/{user_id}", dependencies=[Depends(require_admin)])
-def delete_user(user_id: int, db: Session = Depends(get_db), current=Depends(require_admin)):
-    if user_id == current.id:
+def delete_user(user_id: str, current=Depends(require_admin)):
+    if user_id == current["uid"]:
         raise HTTPException(400, "Cannot delete your own account")
-    user = db.query(User).get(user_id)
-    if not user:
+    if not fdb.get("users", user_id):
         raise HTTPException(404, "User not found")
-    db.delete(user)
-    db.commit()
+    try:
+        fb_auth.delete_user(user_id)
+    except fb_auth.UserNotFoundError:
+        pass
+    fdb.delete("users", user_id)
     return {"ok": True}

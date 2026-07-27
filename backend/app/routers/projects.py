@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Response
-from sqlalchemy.orm import Session
+import datetime
 
-from ..db import get_db
-from ..models import Project, Product, Client
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Response
+
+from .. import firestore_db as fdb
 from ..storage import storage
 from ..schema import merged_field_values
 from ..services.pptx_export_v2 import export_project_v2
@@ -16,7 +16,17 @@ from ..auth import get_current_user
 router = APIRouter(prefix="/projects", tags=["projects"], dependencies=[Depends(get_current_user)])
 
 
-def _gather_selected_products(data: dict, db: Session) -> dict:
+class _ProjectView:
+    """Minimal attribute-access shim so pptx_export_v2.py (which reads
+    `project.data` / `project.uploads`) doesn't need to change for Firestore's
+    plain dicts."""
+
+    def __init__(self, doc: dict):
+        self.data = doc.get("data") or {}
+        self.uploads = doc.get("uploads") or {}
+
+
+def _gather_selected_products(data: dict) -> dict:
     """Build {category: product_dict} from the *_product_id values stored on
     the project, for the spec-table slides (14-16) and warranty (22)."""
     selected = {}
@@ -24,144 +34,144 @@ def _gather_selected_products(data: dict, db: Session) -> dict:
         pid = data.get(f"{category}_product_id")
         if not pid:
             continue
-        prod = db.query(Product).get(pid)
+        prod = fdb.get("products", str(pid))
         if prod:
             selected[category] = {
-                "spec_title": prod.spec_title,
-                "brand": prod.brand,
-                "model_name": prod.model_name,
-                "unit_value": prod.unit_value,
-                "unit_label": prod.unit_label,
-                "specs": prod.specs or [],
-                "warranty_line": prod.warranty_line,
-                "image_path": prod.image_path,
+                "spec_title": prod.get("spec_title"),
+                "brand": prod.get("brand"),
+                "model_name": prod.get("model_name"),
+                "unit_value": prod.get("unit_value"),
+                "unit_label": prod.get("unit_label"),
+                "specs": prod.get("specs") or [],
+                "warranty_line": prod.get("warranty_line"),
+                "image_path": prod.get("image_path"),
             }
     return selected
 
 
-def _serialize(p: Project) -> dict:
+def _serialize(p: dict) -> dict:
+    client_name = None
+    if p.get("client_id"):
+        client = fdb.get("clients", p["client_id"])
+        client_name = client.get("name") if client else None
     return {
-        "id": p.id,
-        "client_id": p.client_id,
-        "client_name": p.client.name if p.client else None,
-        "name": p.name,
-        "status": p.status,
-        "data": p.data or {},
-        "uploads": p.uploads or {},
-        "computed": merged_field_values(p.data or {}),
-        "slide19_image_url": storage.url_for(p.slide19_image_path) if storage.exists(p.slide19_image_path) else None,
-        "export_count": p.export_count,
-        "last_exported_at": p.last_exported_at.isoformat() if p.last_exported_at else None,
-        "created_at": p.created_at.isoformat() if p.created_at else None,
-        "updated_at": p.updated_at.isoformat() if p.updated_at else None,
+        "id": p["id"],
+        "client_id": p.get("client_id"),
+        "client_name": client_name,
+        "name": p.get("name"),
+        "status": p.get("status", "draft"),
+        "data": p.get("data") or {},
+        "uploads": p.get("uploads") or {},
+        "computed": merged_field_values(p.get("data") or {}),
+        "slide19_image_url": storage.url_for(p["slide19_image_path"]) if storage.exists(p.get("slide19_image_path")) else None,
+        "export_count": p.get("export_count", 0),
+        "last_exported_at": p["last_exported_at"].isoformat() if p.get("last_exported_at") else None,
+        "created_at": p["created_at"].isoformat() if p.get("created_at") else None,
+        "updated_at": p["updated_at"].isoformat() if p.get("updated_at") else None,
     }
 
 
 @router.post("")
-def create_project(body: dict, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def create_project(body: dict, user=Depends(get_current_user)):
     client_id = body.get("client_id")
-    if client_id and not db.query(Client).get(client_id):
+    if client_id and not fdb.get("clients", client_id):
         raise HTTPException(404, "Client not found")
-    project = Project(
-        name=body.get("name", "Untitled Project"),
-        data=body.get("data", {}),
-        uploads={},
-        client_id=client_id,
-        created_by_id=user.id,
-    )
-    db.add(project)
-    db.commit()
-    db.refresh(project)
+    project = fdb.create("projects", {
+        "name": body.get("name", "Untitled Project"),
+        "data": body.get("data", {}),
+        "uploads": {},
+        "client_id": client_id,
+        "created_by_id": user["uid"],
+        "status": "draft",
+        "export_count": 0,
+        "last_exported_at": None,
+        "slide19_image_path": None,
+        "flowchart_image_path": None,
+    })
     return _serialize(project)
 
 
 @router.get("")
-def list_projects(db: Session = Depends(get_db)):
-    return [_serialize(p) for p in db.query(Project).order_by(Project.updated_at.desc()).all()]
+def list_projects():
+    rows = fdb.list_all("projects", order_by="updated_at", descending=True)
+    return [_serialize(p) for p in rows]
 
 
 @router.get("/{project_id}")
-def get_project(project_id: int, db: Session = Depends(get_db)):
-    project = db.query(Project).get(project_id)
+def get_project(project_id: str):
+    project = fdb.get("projects", project_id)
     if not project:
         raise HTTPException(404, "Project not found")
     return _serialize(project)
 
 
 @router.put("/{project_id}")
-def update_project(project_id: int, body: dict, db: Session = Depends(get_db)):
-    project = db.query(Project).get(project_id)
-    if not project:
+def update_project(project_id: str, body: dict):
+    if not fdb.get("projects", project_id):
         raise HTTPException(404, "Project not found")
+    patch = {}
     if "name" in body:
-        project.name = body["name"]
+        patch["name"] = body["name"]
     if "data" in body:
-        project.data = body["data"]
+        patch["data"] = body["data"]
     if "client_id" in body:
-        if body["client_id"] and not db.query(Client).get(body["client_id"]):
+        if body["client_id"] and not fdb.get("clients", body["client_id"]):
             raise HTTPException(404, "Client not found")
-        project.client_id = body["client_id"]
-    db.commit()
-    db.refresh(project)
+        patch["client_id"] = body["client_id"]
+    project = fdb.update("projects", project_id, patch)
     return _serialize(project)
 
 
 @router.delete("/{project_id}")
-def delete_project(project_id: int, db: Session = Depends(get_db)):
-    project = db.query(Project).get(project_id)
-    if not project:
+def delete_project(project_id: str):
+    if not fdb.get("projects", project_id):
         raise HTTPException(404, "Project not found")
-    db.delete(project)
-    db.commit()
+    fdb.delete("projects", project_id)
     return {"ok": True}
 
 
 @router.post("/{project_id}/uploads")
-def upload_field_image(project_id: int, field: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
-    project = db.query(Project).get(project_id)
+def upload_field_image(project_id: str, field: str, file: UploadFile = File(...)):
+    project = fdb.get("projects", project_id)
     if not project:
         raise HTTPException(404, "Project not found")
     path = storage.save_bytes(file.file.read(), file.filename)
-    uploads = dict(project.uploads or {})
+    uploads = dict(project.get("uploads") or {})
     uploads[field] = path
-    project.uploads = uploads
-    db.commit()
+    fdb.update("projects", project_id, {"uploads": uploads})
     return {"field": field, "url": storage.url_for(path)}
 
 
 @router.post("/{project_id}/slide19/generate")
-def generate_slide19(project_id: int, body: dict, db: Session = Depends(get_db)):
-    project = db.query(Project).get(project_id)
+def generate_slide19(project_id: str, body: dict):
+    project = fdb.get("projects", project_id)
     if not project:
         raise HTTPException(404, "Project not found")
-    values = merged_field_values(project.data or {})
-    template = body.get("prompt_template") or bp.read(db, "slide19_prompt_template") or imagegen.DEFAULT_PROMPT_TEMPLATE
+    values = merged_field_values(project.get("data") or {})
+    template = body.get("prompt_template") or bp.read("slide19_prompt_template") or imagegen.DEFAULT_PROMPT_TEMPLATE
     try:
         prompt = imagegen.render_prompt(template, values)
         img_bytes = imagegen.generate_image(prompt)
     except imagegen.ImageGenError as e:
         raise HTTPException(502, f"Image generation failed: {e}. Upload an image manually instead.")
     path = storage.save_bytes(img_bytes, "slide19.png")
-    project.slide19_image_path = path
-    db.commit()
+    fdb.update("projects", project_id, {"slide19_image_path": path})
     return {"url": storage.url_for(path)}
 
 
 @router.post("/{project_id}/slide19/upload")
-def upload_slide19_fallback(project_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
-    project = db.query(Project).get(project_id)
+def upload_slide19_fallback(project_id: str, file: UploadFile = File(...)):
+    project = fdb.get("projects", project_id)
     if not project:
         raise HTTPException(404, "Project not found")
     path = storage.save_bytes(file.file.read(), file.filename)
-    project.slide19_image_path = path
-    db.commit()
+    fdb.update("projects", project_id, {"slide19_image_path": path})
     return {"url": storage.url_for(path)}
 
 
 @router.post("/{project_id}/analyze-consumption")
-def analyze_consumption_excel(project_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
-    project = db.query(Project).get(project_id)
-    if not project:
+def analyze_consumption_excel(project_id: str, file: UploadFile = File(...)):
+    if not fdb.get("projects", project_id):
         raise HTTPException(404, "Project not found")
     try:
         result = analyze_consumption(file.file.read())
@@ -171,48 +181,48 @@ def analyze_consumption_excel(project_id: int, file: UploadFile = File(...), db:
 
 
 @router.get("/{project_id}/slide21/draft")
-def slide21_draft(project_id: int, db: Session = Depends(get_db)):
-    project = db.query(Project).get(project_id)
+def slide21_draft(project_id: str):
+    project = fdb.get("projects", project_id)
     if not project:
         raise HTTPException(404, "Project not found")
-    values = merged_field_values(project.data or {})
+    values = merged_field_values(project.get("data") or {})
     return {"text": compose_power_priority_draft(values)}
 
 
 @router.get("/{project_id}/slide20/preview")
-def preview_flowchart(project_id: int, db: Session = Depends(get_db)):
-    project = db.query(Project).get(project_id)
+def preview_flowchart(project_id: str):
+    project = fdb.get("projects", project_id)
     if not project:
         raise HTTPException(404, "Project not found")
-    values = merged_field_values(project.data or {})
+    values = merged_field_values(project.get("data") or {})
     png = render_priority_flowchart(values)
     return Response(content=png, media_type="image/png")
 
 
 @router.post("/{project_id}/export")
-def export(project_id: int, db: Session = Depends(get_db)):
-    project = db.query(Project).get(project_id)
+def export(project_id: str):
+    project = fdb.get("projects", project_id)
     if not project:
         raise HTTPException(404, "Project not found")
-    company_info = bp.read(db, "company_info")
-    selected_products = _gather_selected_products(project.data or {}, db)
-    closing_statement = bp.read(db, "closing_statement")
+    company_info = bp.read("company_info")
+    selected_products = _gather_selected_products(project.get("data") or {})
+    closing_statement = bp.read("closing_statement")
     pptx_bytes = export_project_v2(
-        project, storage, company_info=company_info,
+        _ProjectView(project), storage, company_info=company_info,
         selected_products=selected_products, closing_statement=closing_statement,
     )
     # track export stats (month bucket) for the dashboard
-    import datetime as _dt
-    stats = dict(bp.read(db, "export_stats") or {})
+    stats = dict(bp.read("export_stats") or {})
     by_month = dict(stats.get("by_month") or {})
-    m = _dt.date.today().strftime("%Y-%m")
+    m = datetime.date.today().strftime("%Y-%m")
     by_month[m] = by_month.get(m, 0) + 1
-    bp.write(db, "export_stats", {"total": (stats.get("total", 0) + 1), "by_month": by_month})
-    project.status = "exported"
-    project.export_count = (project.export_count or 0) + 1
-    project.last_exported_at = _dt.datetime.utcnow()
-    db.commit()
-    filename = f"{(project.data or {}).get('site_name') or project.name}_proposal.pptx".replace(" ", "_")
+    bp.write("export_stats", {"total": (stats.get("total", 0) + 1), "by_month": by_month})
+    fdb.update("projects", project_id, {
+        "status": "exported",
+        "export_count": (project.get("export_count") or 0) + 1,
+        "last_exported_at": datetime.datetime.utcnow(),
+    })
+    filename = f"{(project.get('data') or {}).get('site_name') or project.get('name')}_proposal.pptx".replace(" ", "_")
     return Response(
         content=pptx_bytes,
         media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",

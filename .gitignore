@@ -8,8 +8,12 @@ frontend/dist/
 *.pyc
 .env
 .DS_Store
+zarni elec _ db pass.rtf
 .claude/
 frontend/.vite/
+.firebase/
+firestore-debug.log
+ui-debug.log
 
 # reference decks / office lock files
 MRTV -Update file.pptx

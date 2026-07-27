@@ -3,10 +3,8 @@ from __future__ import annotations
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from sqlalchemy.orm import Session
 
-from ..db import get_db
-from ..models import Product
+from .. import firestore_db as fdb
 from ..storage import storage
 from ..auth import require_admin
 from .. import boilerplate as bp
@@ -14,8 +12,8 @@ from .. import boilerplate as bp
 router = APIRouter(prefix="/admin/products", tags=["products"])
 
 
-def _allowed_categories(db: Session) -> set:
-    cats = bp.read(db, "product_categories") or []
+def _allowed_categories() -> set:
+    cats = bp.read("product_categories") or []
     return {c.get("key") for c in cats if c.get("key")}
 
 
@@ -38,85 +36,77 @@ def _normalize_specs(specs):
     return out
 
 
-def _serialize(p: Product) -> dict:
+def _serialize(p: dict) -> dict:
     return {
-        "id": p.id,
-        "category": p.category,
-        "brand": p.brand,
-        "model_name": p.model_name,
-        "unit_value": p.unit_value,
-        "unit_label": p.unit_label,
-        "spec_title": p.spec_title,
-        "specs": p.specs or [],
-        "warranty_line": p.warranty_line,
-        "image_url": storage.url_for(p.image_path) if storage.exists(p.image_path) else None,
-        "created_at": p.created_at.isoformat() if p.created_at else None,
+        "id": p["id"],
+        "category": p.get("category"),
+        "brand": p.get("brand"),
+        "model_name": p.get("model_name"),
+        "unit_value": p.get("unit_value"),
+        "unit_label": p.get("unit_label"),
+        "spec_title": p.get("spec_title"),
+        "specs": p.get("specs") or [],
+        "warranty_line": p.get("warranty_line"),
+        "image_url": storage.url_for(p["image_path"]) if storage.exists(p.get("image_path")) else None,
+        "created_at": p["created_at"].isoformat() if p.get("created_at") else None,
     }
 
 
 @router.get("")
-def list_products(category: Optional[str] = None, db: Session = Depends(get_db)):
+def list_products(category: Optional[str] = None):
     """Listing is open so the proposal form can populate product dropdowns."""
-    q = db.query(Product)
-    if category:
-        q = q.filter(Product.category == category)
-    return [_serialize(p) for p in q.order_by(Product.category, Product.brand).all()]
+    rows = fdb.query_eq("products", "category", category) if category else fdb.list_all("products")
+    rows.sort(key=lambda p: (p.get("category") or "", p.get("brand") or ""))
+    return [_serialize(p) for p in rows]
 
 
 @router.post("", dependencies=[Depends(require_admin)])
-def create_product(body: dict, db: Session = Depends(get_db)):
+def create_product(body: dict):
     category = (body.get("category") or "").strip()
-    allowed = _allowed_categories(db)
-    if category not in allowed:
+    if category not in _allowed_categories():
         raise HTTPException(400, f"Unknown category '{category}'. Add it in Admin first.")
-    p = Product(
-        category=category,
-        brand=body.get("brand", ""),
-        model_name=body.get("model_name", ""),
-        unit_value=body.get("unit_value"),
-        unit_label=body.get("unit_label"),
-        spec_title=body.get("spec_title"),
-        specs=_normalize_specs(body.get("specs", [])),
-        warranty_line=body.get("warranty_line"),
-    )
-    db.add(p)
-    db.commit()
-    db.refresh(p)
+    p = fdb.create("products", {
+        "category": category,
+        "brand": body.get("brand", ""),
+        "model_name": body.get("model_name", ""),
+        "unit_value": body.get("unit_value"),
+        "unit_label": body.get("unit_label"),
+        "spec_title": body.get("spec_title"),
+        "specs": _normalize_specs(body.get("specs", [])),
+        "warranty_line": body.get("warranty_line"),
+        "image_path": None,
+    })
     return _serialize(p)
 
 
 @router.put("/{product_id}", dependencies=[Depends(require_admin)])
-def update_product(product_id: int, body: dict, db: Session = Depends(get_db)):
-    p = db.query(Product).get(product_id)
-    if not p:
-        raise HTTPException(404, "Product not found")
+def update_product(product_id: str, body: dict):
+    patch = {}
     for field in ("brand", "model_name", "unit_value", "unit_label", "spec_title", "warranty_line"):
         if field in body:
-            setattr(p, field, body[field])
+            patch[field] = body[field]
     if "specs" in body:
-        p.specs = _normalize_specs(body["specs"])
-    if "category" in body and body["category"] in _allowed_categories(db):
-        p.category = body["category"]
-    db.commit()
-    db.refresh(p)
+        patch["specs"] = _normalize_specs(body["specs"])
+    if "category" in body and body["category"] in _allowed_categories():
+        patch["category"] = body["category"]
+    p = fdb.update("products", product_id, patch)
+    if not p:
+        raise HTTPException(404, "Product not found")
     return _serialize(p)
 
 
 @router.delete("/{product_id}", dependencies=[Depends(require_admin)])
-def delete_product(product_id: int, db: Session = Depends(get_db)):
-    p = db.query(Product).get(product_id)
-    if not p:
+def delete_product(product_id: str):
+    if not fdb.get("products", product_id):
         raise HTTPException(404, "Product not found")
-    db.delete(p)
-    db.commit()
+    fdb.delete("products", product_id)
     return {"ok": True}
 
 
 @router.post("/{product_id}/image", dependencies=[Depends(require_admin)])
-def upload_product_image(product_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
-    p = db.query(Product).get(product_id)
-    if not p:
+def upload_product_image(product_id: str, file: UploadFile = File(...)):
+    if not fdb.get("products", product_id):
         raise HTTPException(404, "Product not found")
-    p.image_path = storage.save_bytes(file.file.read(), file.filename)
-    db.commit()
-    return {"image_url": storage.url_for(p.image_path)}
+    image_path = storage.save_bytes(file.file.read(), file.filename)
+    fdb.update("products", product_id, {"image_path": image_path})
+    return {"image_url": storage.url_for(image_path)}

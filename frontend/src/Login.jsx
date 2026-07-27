@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { api } from "./api";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "./firebaseClient";
 
-export default function Login({ onLoggedIn }) {
+export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
@@ -12,8 +13,8 @@ export default function Login({ onLoggedIn }) {
     setBusy(true);
     setError(null);
     try {
-      const user = await api.login(email, password);
-      onLoggedIn(user);
+      await signInWithEmailAndPassword(auth, email, password);
+      // no further action needed -- App.jsx's onAuthStateChanged picks this up
     } catch (err) {
       setError("Invalid email or password");
     } finally {

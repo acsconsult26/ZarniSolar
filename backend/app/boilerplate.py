@@ -1,10 +1,9 @@
 """Shared admin-editable boilerplate store (key/value JSON), used by both the
-admin router and the export pipeline."""
+admin router and the export pipeline. Each key is its own Firestore document
+in the `boilerplate` collection, holding a single `value` field."""
 from __future__ import annotations
 
-from sqlalchemy.orm import Session
-
-from .models import Boilerplate
+from .firebase import db
 from .services.imagegen import DEFAULT_PROMPT_TEMPLATE
 
 BOILERPLATE_DEFAULTS = {
@@ -57,21 +56,26 @@ BOILERPLATE_DEFAULTS = {
 EDITABLE_KEYS = set(BOILERPLATE_DEFAULTS) - {"export_stats"}
 
 
-def get_or_seed(db: Session, key: str) -> Boilerplate:
-    row = db.query(Boilerplate).get(key)
-    if row is None:
-        row = Boilerplate(key=key, value=BOILERPLATE_DEFAULTS.get(key, {}))
-        db.add(row)
-        db.commit()
-    return row
+def _doc_ref(key: str):
+    return db.collection("boilerplate").document(key)
 
 
-def read(db: Session, key: str):
-    return get_or_seed(db, key).value
+def get_or_seed(key: str):
+    """Returns the stored value for `key`, seeding it from BOILERPLATE_DEFAULTS
+    on first read. Kept as a function (not a row object) since Firestore has
+    no ORM row to return here -- callers only ever wanted `.value` anyway."""
+    snap = _doc_ref(key).get()
+    if snap.exists:
+        return (snap.to_dict() or {}).get("value")
+    default = BOILERPLATE_DEFAULTS.get(key, {})
+    _doc_ref(key).set({"value": default})
+    return default
 
 
-def write(db: Session, key: str, value):
-    row = get_or_seed(db, key)
-    row.value = value
-    db.commit()
-    return row.value
+def read(key: str):
+    return get_or_seed(key)
+
+
+def write(key: str, value):
+    _doc_ref(key).set({"value": value})
+    return value

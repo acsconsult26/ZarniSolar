@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { api, getToken, clearToken } from "./api";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { auth } from "./firebaseClient";
+import { api, ensureFreshToken } from "./api";
 import { SECTIONS, perUnitCost, roiCompute, paybackRows } from "./fields";
 import RichText from "./RichText";
 import Admin from "./Admin";
@@ -570,28 +572,25 @@ export default function App() {
   const [activeProject, setActiveProject] = useState(null); // null = show client picker
 
   useEffect(() => {
-    if (!getToken()) {
-      setAuthState("out");
-      return;
-    }
-    api.me().then((me) => {
-      setUser(me);
-      setView(me.role === "admin" ? "admin" : "form");
-      setAuthState("in");
-    }).catch(() => {
-      clearToken();
-      setAuthState("out");
+    return onAuthStateChanged(auth, (fbUser) => {
+      if (!fbUser) {
+        setUser(null);
+        setAuthState("out");
+        return;
+      }
+      ensureFreshToken().then(() => api.me()).then((me) => {
+        setUser(me);
+        setView(me.role === "admin" ? "admin" : "form");
+        setAuthState("in");
+      }).catch(() => {
+        signOut(auth);
+        setAuthState("out");
+      });
     });
   }, []);
 
-  function handleLoggedIn(loginResult) {
-    setUser(loginResult);
-    setView(loginResult.role === "admin" ? "admin" : "form");
-    setAuthState("in");
-  }
-
   function logout() {
-    clearToken();
+    signOut(auth);
     setUser(null);
     setAuthState("out");
     setActiveProject(null);
@@ -606,7 +605,7 @@ export default function App() {
   }
 
   if (authState === "checking") return null;
-  if (authState === "out") return <Login onLoggedIn={handleLoggedIn} />;
+  if (authState === "out") return <Login />;
 
   const isAdmin = user?.role === "admin";
 

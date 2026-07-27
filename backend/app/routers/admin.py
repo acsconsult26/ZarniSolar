@@ -1,85 +1,64 @@
 from __future__ import annotations
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Body
-from sqlalchemy.orm import Session
-
 import datetime
 
-from ..db import get_db
-from ..models import ReferenceImage
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Body
+
+from .. import firestore_db as fdb
 from ..storage import storage
-from ..auth import authenticate, issue_token, require_admin, get_current_user
-from ..boilerplate import BOILERPLATE_DEFAULTS, EDITABLE_KEYS, get_or_seed
+from ..auth import require_admin, get_current_user
+from ..boilerplate import BOILERPLATE_DEFAULTS, EDITABLE_KEYS, get_or_seed, write as write_boilerplate
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
-@router.post("/login")
-def login(body: dict, db: Session = Depends(get_db)):
-    email = body.get("email", "")
-    password = body.get("password", "")
-    user = authenticate(db, email, password)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-    user.last_login_at = datetime.datetime.utcnow()
-    db.commit()
-    return {"token": issue_token(user), "email": user.email, "name": user.name, "role": user.role}
-
-
 @router.get("/me")
 def me(user=Depends(get_current_user)):
-    return {"authenticated": True, "email": user.email, "name": user.name, "role": user.role}
+    fdb.update("users", user["uid"], {"last_login_at": datetime.datetime.utcnow()})
+    return {"authenticated": True, "email": user.get("email"), "name": user.get("name"), "role": user.get("role")}
+
 
 @router.get("/boilerplate/{key}")
-def get_boilerplate(key: str, db: Session = Depends(get_db)):
+def get_boilerplate(key: str):
     if key not in BOILERPLATE_DEFAULTS:
         raise HTTPException(404, f"Unknown boilerplate key: {key}")
-    return get_or_seed(db, key).value
+    return get_or_seed(key)
 
 
 @router.put("/boilerplate/{key}", dependencies=[Depends(require_admin)])
-def put_boilerplate(key: str, value=Body(...), db: Session = Depends(get_db)):
+def put_boilerplate(key: str, value=Body(...)):
     if key not in EDITABLE_KEYS:
         raise HTTPException(404, f"Unknown or read-only boilerplate key: {key}")
-    row = get_or_seed(db, key)
-    row.value = value
-    db.commit()
-    return row.value
+    return write_boilerplate(key, value)
 
 
 @router.get("/reference-images")
-def list_reference_images(db: Session = Depends(get_db)):
-    rows = db.query(ReferenceImage).order_by(ReferenceImage.sort_order).all()
+def list_reference_images():
+    rows = fdb.list_all("reference_images", order_by="sort_order")
     return [
-        {"id": r.id, "url": storage.url_for(r.file_path), "tag": r.tag, "sort_order": r.sort_order}
+        {"id": r["id"], "url": storage.url_for(r["file_path"]), "tag": r.get("tag"), "sort_order": r.get("sort_order", 0)}
         for r in rows
     ]
 
 
 @router.post("/reference-images")
-def upload_reference_image(tag: str = "", file: UploadFile = File(...), db: Session = Depends(get_db)):
+def upload_reference_image(tag: str = "", file: UploadFile = File(...)):
     path = storage.save_bytes(file.file.read(), file.filename)
-    max_order = db.query(ReferenceImage).count()
-    row = ReferenceImage(file_path=path, tag=tag, sort_order=max_order)
-    db.add(row)
-    db.commit()
-    return {"id": row.id, "url": storage.url_for(path)}
+    max_order = len(fdb.list_all("reference_images"))
+    row = fdb.create("reference_images", {"file_path": path, "tag": tag, "sort_order": max_order})
+    return {"id": row["id"], "url": storage.url_for(path)}
 
 
 @router.delete("/reference-images/{image_id}")
-def delete_reference_image(image_id: int, db: Session = Depends(get_db)):
-    row = db.query(ReferenceImage).get(image_id)
-    if not row:
+def delete_reference_image(image_id: str):
+    if not fdb.get("reference_images", image_id):
         raise HTTPException(404, "Not found")
-    db.delete(row)
-    db.commit()
+    fdb.delete("reference_images", image_id)
     return {"ok": True}
 
 
 @router.put("/reference-images/reorder")
-def reorder_reference_images(order: list[int], db: Session = Depends(get_db)):
+def reorder_reference_images(order: list[str]):
     for idx, image_id in enumerate(order):
-        row = db.query(ReferenceImage).get(image_id)
-        if row:
-            row.sort_order = idx
-    db.commit()
+        if fdb.get("reference_images", image_id):
+            fdb.update("reference_images", image_id, {"sort_order": idx})
     return {"ok": True}

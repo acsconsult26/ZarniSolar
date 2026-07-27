@@ -1,18 +1,25 @@
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
-const TOKEN_KEY = "zarni_token";
+import { onIdTokenChanged } from "firebase/auth";
+import { auth } from "./firebaseClient";
 
-export function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+
+// Firebase ID tokens are fetched async, but most call sites here build headers
+// synchronously -- so cache the latest token and keep it fresh via the SDK's
+// own onIdTokenChanged (fires on sign-in/out and automatic token refresh).
+let currentToken = null;
+onIdTokenChanged(auth, async (user) => {
+  currentToken = user ? await user.getIdToken() : null;
+});
+
+// Call this before the first request after a sign-in state change (e.g. right
+// after onAuthStateChanged fires) -- onIdTokenChanged above is async, so
+// currentToken can otherwise still be stale/null for a brief window.
+export async function ensureFreshToken() {
+  currentToken = auth.currentUser ? await auth.currentUser.getIdToken() : null;
 }
-export function setToken(token) {
-  localStorage.setItem(TOKEN_KEY, token);
-}
-export function clearToken() {
-  localStorage.removeItem(TOKEN_KEY);
-}
+
 function authHeaders() {
-  const token = getToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return currentToken ? { Authorization: `Bearer ${currentToken}` } : {};
 }
 
 async function json(resp) {
@@ -101,16 +108,6 @@ export const api = {
     fetch(`${API_BASE}/projects/${id}`, { method: "DELETE", headers: authHeaders() }).then(json),
 
   // ---- auth ----
-  login: (email, password) =>
-    fetch(`${API_BASE}/admin/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    }).then(json).then((r) => {
-      setToken(r.token);
-      return r;
-    }),
-
   me: () => fetch(`${API_BASE}/admin/me`, { headers: authHeaders() }).then(json),
 
   // ---- clients ----
