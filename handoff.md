@@ -4,6 +4,17 @@ Running log of notable changes for AI tooling/session continuity. Newest entries
 
 ---
 
+## 2026-07-28 — Power Analyzer CSV/Excel analysis feature + fixed a login-crashing CORS false alarm
+
+- **Fixed `/admin/me` login crash**: comparing Firestore's timezone-aware `last_login_at` against `datetime.utcnow()` (naive) raised an unhandled `TypeError`. Since it was unhandled, it bypassed FastAPI's CORS middleware entirely, so the browser only reported a missing `Access-Control-Allow-Origin` header instead of the real 500 — not an actual CORS misconfiguration. Fixed in `backend/app/routers/admin.py`.
+- **New Power Analyzer CSV/Excel analysis feature** (Power Analyzer step, slide 10, and the optional Second Survey's slide 12):
+  - `backend/app/services/power_analyzer.py` (new) — parses the analyzer's raw trend-log export (CSV or XLSX). The device's header layout is unusually tricky: group labels (e.g. "W") sit in a merged/centered cell over their L1/L2/L3(+total) sub-columns rather than the group's first column, and some phase readings switch units between W and kW depending on magnitude mid-file. Verified against a real ~8,640-row 2-day sample file from the client (`Ko Min Han,MRTV ALL.csv`) — caught and fixed two real bugs this way: (1) a date-format bug (device uses YY/MM/DD, not DD/MM/YY), (2) a column-segmentation bug that mixed in a neighboring group's column and summed mismatched W/kW units, producing a nonsense ~1998kW "peak" before the fix (correct peak is ~139kW).
+  - `backend/app/services/chart_power_hourly.py` (new) — renders the hourly-load bar chart via matplotlib, same transparent dark-deck styling as the existing `chart_usage.py`.
+  - `POST /projects/{id}/analyze-power-log?field=analyzer|second_analyzer` (new, in `projects.py`) — computes avg/peak kW, PF, THD (voltage & current), stores the stats on the project's `data` and the rendered chart image in Firebase Storage (via the existing compression pipeline), returns both plus the chart URL.
+  - `pptx_export_v2.py` — new `_slide_analyzer_stats` slide (dynamically numbered, inserted right after the fixed-numbered slide 10/12 analyzer slides) shows the stats + chart image on export.
+  - Frontend: new `PowerAnalyzer` component (`App.jsx`) with a real upload-progress bar (via `XMLHttpRequest` for progress events) transitioning through uploading → analyzing → done/error, showing stat cards and the chart preview (same image used in the deck). Wired into both the primary and second-survey analyzer sections via a new `powerAnalyzer` field on their `fields.js` section configs.
+  - Architecture: built into the existing FastAPI backend (Cloud Run), not a separate Cloud Function — matches the existing consumption-Excel-analyzer pattern (`excel_analysis.py`), avoids a second deploy target and duplicate `pandas`/`openpyxl` dependencies.
+
 ## 2026-07-27 — Proposal form bug fixes: rich text, image uploads, date pickers, gateway product, east view
 
 - **Rich text editor broken** (`frontend/src/RichText.jsx`, `App.jsx`): the contentEditable box was wrapped in a `<label>` with no associated form control, which silently ate the click-to-focus in Chrome — typing/bold/italic did nothing. Fixed by using a `<div>` wrapper. Also replaced the deprecated/unreliable `document.execCommand` formatting calls with manual Range/DOM wrapping (`<strong>`/`<em>`/`<u>` + manual list insertion) since execCommand didn't reliably apply formatting.

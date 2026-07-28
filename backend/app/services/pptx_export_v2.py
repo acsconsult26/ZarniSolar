@@ -78,11 +78,21 @@ def export_project_v2(project, storage, company_info=None, selected_products=Non
     _slide10_analyzer(prs, client, v.get("analyzer_date_range"), imgs.get("analyzer_image"),
                       company_name, page=10)
 
+    if imgs.get("analyzer_chart"):
+        page = len(prs.slides._sldIdLst) + 1
+        _slide_analyzer_stats(prs, f"Power Analyzer — Hourly Load Profile for {client}",
+                              data.get("analyzer_stats"), imgs.get("analyzer_chart"), company_name, page)
+
     if data.get("include_second_survey"):
         _slide9_data_result(prs, client, v, imgs, company_name, page=11, prefix="second_",
                             title="Surveying Data Result (Other Meters)")
         _slide10_analyzer(prs, client, v.get("second_analyzer_date_range"),
                           imgs.get("second_analyzer_image"), company_name, page=12)
+        if imgs.get("second_analyzer_chart"):
+            page = len(prs.slides._sldIdLst) + 1
+            _slide_analyzer_stats(prs, f"Power Analyzer (Other Meters) — Hourly Load Profile",
+                                  data.get("second_analyzer_stats"), imgs.get("second_analyzer_chart"),
+                                  company_name, page)
 
     # Slides 13-14 : System Requirement options (up to 4, 2 per slide)
     options = [o for o in (data.get("system_options") or [])
@@ -350,6 +360,37 @@ def _slide10_analyzer(prs, client, date_range, image, company_name, page):
                             prs.slide_height - top - Inches(0.9))
     else:
         _placeholder(slide, Inches(0.9), top, prs.slide_width - Inches(1.8), prs.slide_height - top - Inches(0.9))
+
+
+def _slide_analyzer_stats(prs, title, stats, chart_image, company_name, page):
+    slide = T.add_slide(prs, page=page, company_name=company_name)
+    top = T.add_title(slide, prs, title)
+
+    stats = stats or {}
+
+    def stat_line(label, avg_key, peak_key, unit):
+        avg = stats.get(avg_key)
+        peak = stats.get(peak_key)
+        avg_s = f"{avg}{unit}" if avg is not None else "—"
+        peak_s = f"{peak}{unit}" if peak is not None else "—"
+        return f"{label}   Avg {avg_s}   ·   Peak {peak_s}"
+
+    lines = [
+        stat_line("kW", "avg_kw", "peak_kw", " kW"),
+        stat_line("PF", "avg_pf", "peak_pf", ""),
+        stat_line("THD (Voltage)", "avg_thd_voltage", "peak_thd_voltage", "%"),
+        stat_line("THD (Current)", "avg_thd_current", "peak_thd_current", "%"),
+    ]
+    T.add_text(slide, "\n".join(lines), Inches(0.6), top, prs.slide_width - Inches(1.2), Inches(1.3),
+              size=14, color=T.MUTED, line_spacing=1.3)
+
+    chart_top = top + Inches(1.4)
+    if chart_image:
+        T.add_image_contain(slide, chart_image, Inches(0.6), chart_top, prs.slide_width - Inches(1.2),
+                            prs.slide_height - chart_top - Inches(0.6))
+    else:
+        _placeholder(slide, Inches(0.6), chart_top, prs.slide_width - Inches(1.2),
+                     prs.slide_height - chart_top - Inches(0.6))
 
 
 def _slide_photo_row(prs, title, images, company_name, page, labels=None):

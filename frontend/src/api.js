@@ -80,6 +80,14 @@ export const api = {
     return fetch(`${API_BASE}/projects/${id}/analyze-consumption`, { method: "POST", headers: authHeaders(), body: fd }).then(json);
   },
 
+  analyzePowerLog: (id, field, file) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return fetch(`${API_BASE}/projects/${id}/analyze-power-log?field=${encodeURIComponent(field)}`, {
+      method: "POST", headers: authHeaders(), body: fd,
+    }).then(json);
+  },
+
   previewFlowchartUrl: (id) => `${API_BASE}/projects/${id}/slide20/preview?t=${Date.now()}`,
 
   exportProject: async (id) => {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "./firebaseClient";
-import { api, ensureFreshToken } from "./api";
+import API_BASE, { api, ensureFreshToken } from "./api";
 import { SECTIONS, perUnitCost, roiCompute, paybackRows } from "./fields";
 import RichText from "./RichText";
 import Admin from "./Admin";
@@ -172,6 +172,105 @@ function ExcelAnalyze({ config, projectId, data, setField }) {
       )}
       {(avg != null && avg !== "") && (
         <p className="excel-confirmed">In slide → Average {avg} units · Peak {peak} units</p>
+      )}
+    </div>
+  );
+}
+
+function PowerAnalyzer({ config, projectId, data, uploads, setField, setUploads }) {
+  const fieldKey = config.field;
+  const statsKey = `${fieldKey}_stats`;
+  const chartField = `${fieldKey}_chart`;
+  const [status, setStatus] = useState(data[statsKey] ? "done" : "idle"); // idle | uploading | analyzing | done | error
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState(null);
+
+  const stats = data[statsKey];
+  const chartUrl = api.fileUrl(uploads[chartField]);
+
+  async function handleFile(e) {
+    const file = e.target.files[0];
+    if (!file || !projectId) return;
+    setStatus("uploading");
+    setProgress(0);
+    setError(null);
+    try {
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+      const result = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", `${API_BASE}/projects/${projectId}/analyze-power-log?field=${encodeURIComponent(fieldKey)}`);
+        if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+        xhr.upload.onprogress = (ev) => {
+          if (ev.lengthComputable) setProgress(Math.round((ev.loaded / ev.total) * 100));
+        };
+        xhr.upload.onload = () => setStatus("analyzing");
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try { resolve(JSON.parse(xhr.responseText)); } catch { reject(new Error("Bad response from server")); }
+          } else {
+            reject(new Error(`${xhr.status}: ${xhr.responseText}`));
+          }
+        };
+        xhr.onerror = () => reject(new Error("Network error"));
+        const fd = new FormData();
+        fd.append("file", file);
+        xhr.send(fd);
+      });
+      setField(statsKey, result.stats);
+      setUploads((u) => ({ ...u, [chartField]: result.chart_url }));
+      setStatus("done");
+    } catch (err) {
+      setError(String(err));
+      setStatus("error");
+    }
+  }
+
+  const stat = (label, avgKey, peakKey, unit = "") => (
+    <div className="pa-stat">
+      <span className="pa-stat-label">{label}</span>
+      <span className="pa-stat-value">
+        Avg {stats?.[avgKey] ?? "—"}{stats?.[avgKey] != null ? unit : ""}
+        {" · "}
+        Peak {stats?.[peakKey] ?? "—"}{stats?.[peakKey] != null ? unit : ""}
+      </span>
+    </div>
+  );
+
+  return (
+    <div className="power-analyzer">
+      <h3>Power Analyzer Log (CSV/Excel)</h3>
+      <p className="hint">Upload the analyzer's trend-log export. It's analyzed for kW / PF / THD summary stats and an hourly load chart — both used on the slide.</p>
+      <input type="file" accept=".csv,.xlsx,.xls" onChange={handleFile} disabled={status === "uploading" || status === "analyzing"} />
+
+      {status === "uploading" && (
+        <div className="pa-progress">
+          <div className="pa-progress-bar"><div className="pa-progress-fill" style={{ width: `${progress}%` }} /></div>
+          <span>Uploading… {progress}%</span>
+        </div>
+      )}
+      {status === "analyzing" && (
+        <div className="pa-progress">
+          <div className="pa-progress-bar indeterminate"><div className="pa-progress-fill" /></div>
+          <span>Analyzing…</span>
+        </div>
+      )}
+      {status === "error" && <p className="error">{error}</p>}
+
+      {status === "done" && stats && (
+        <div className="pa-result">
+          <div className="pa-stats-grid">
+            {stat("kW", "avg_kw", "peak_kw", " kW")}
+            {stat("PF", "avg_pf", "peak_pf")}
+            {stat("THD (Voltage)", "avg_thd_voltage", "peak_thd_voltage", "%")}
+            {stat("THD (Current)", "avg_thd_current", "peak_thd_current", "%")}
+          </div>
+          {chartUrl && (
+            <div className="pa-chart-preview">
+              <span className="pa-chart-label">Hourly Load Chart (used on the slide)</span>
+              <img src={chartUrl} alt="Hourly load chart" />
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -584,6 +683,11 @@ function ProposalForm({ initialProject, onExitToPicker }) {
 
                 {section.excelAnalyze && (
                   <ExcelAnalyze config={section.excelAnalyze} projectId={projectId} data={data} setField={setField} />
+                )}
+
+                {section.powerAnalyzer && (
+                  <PowerAnalyzer config={section.powerAnalyzer} projectId={projectId} data={data} uploads={uploads}
+                                setField={setField} setUploads={setUploads} />
                 )}
 
                 {section.images && (

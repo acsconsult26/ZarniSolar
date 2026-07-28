@@ -7,6 +7,8 @@ from ..storage import storage
 from ..schema import merged_field_values
 from ..services.pptx_export_v2 import export_project_v2
 from ..services.excel_analysis import analyze_consumption
+from ..services.power_analyzer import analyze_power_log
+from ..services.chart_power_hourly import render_hourly_chart
 from ..services import imagegen
 from ..services.flowchart import render_priority_flowchart
 from ..services.text_drafts import compose_power_priority_draft
@@ -180,6 +182,34 @@ def analyze_consumption_excel(project_id: str, file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(400, f"Could not analyze the spreadsheet: {e}")
     return result
+
+
+@router.post("/{project_id}/analyze-power-log")
+def analyze_power_log_endpoint(project_id: str, field: str, file: UploadFile = File(...)):
+    """Parses an uploaded power-analyzer trend log (CSV/XLSX), computes
+    summary stats, renders the hourly-load bar chart, and stores both on the
+    project so the pptx export can reuse the same chart image."""
+    project = fdb.get("projects", project_id)
+    if not project:
+        raise HTTPException(404, "Project not found")
+    try:
+        result = analyze_power_log(file.file.read(), file.filename)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(400, f"Could not analyze the file: {e}")
+
+    chart_png = render_hourly_chart(result["hourly"])
+    chart_path = storage.save_bytes(chart_png, f"{field}_chart.png")
+
+    uploads = dict(project.get("uploads") or {})
+    uploads[f"{field}_chart"] = chart_path
+    data = dict(project.get("data") or {})
+    stats = {k: v for k, v in result.items() if k != "hourly"}
+    data[f"{field}_stats"] = stats
+    fdb.update("projects", project_id, {"uploads": uploads, "data": data})
+
+    return {"stats": stats, "hourly": result["hourly"], "chart_url": storage.url_for(chart_path)}
 
 
 @router.get("/{project_id}/slide21/draft")

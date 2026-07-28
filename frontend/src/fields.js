@@ -87,6 +87,7 @@ export const SECTIONS = [
       { name: "analyzer_date_range", label: "Date Range (subtitle)", help: "Pick the survey start and end dates", type: "daterange" },
     ],
     images: [{ name: "analyzer_image", label: "Power Analyzer Image" }],
+    powerAnalyzer: { field: "analyzer" },
   },
   {
     key: "second_survey",
@@ -104,6 +105,7 @@ export const SECTIONS = [
     ],
     images: [{ name: "second_analyzer_image", label: "Power Analyzer Image (Slide 12)" }],
     excelAnalyze: { avgField: "second_avg_units", peakField: "second_peak_units" },
+    powerAnalyzer: { field: "second_analyzer" },
   },
   {
     key: "options",
