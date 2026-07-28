@@ -4,6 +4,13 @@ Running log of notable changes for AI tooling/session continuity. Newest entries
 
 ---
 
+## 2026-07-28 — Fixed CSV upload crash; simplified Surveying Data Result step
+
+- **Fixed**: uploading a CSV on step 8 (Surveying Data Result)'s consumption analyzer threw `400: File is not a zip file`, because `analyze_consumption` only ever called `openpyxl.load_workbook` (xlsx-only, requires a zip container). `backend/app/services/excel_analysis.py` now detects CSV vs Excel by filename and falls back to CSV parsing if openpyxl can't open the file.
+- **Simplified step 8**: removed "Maximum Load Consumption", "Duration Hours", and "Power Factor" from the primary Surveying Data Result form — redundant now that avg/peak consumption comes from the uploaded file. The optional Second Survey step (which has no file-upload derivation of its own) still collects them; `pptx_export_v2.py`'s shared `_slide9_data_result` only renders those rows for that variant.
+
+---
+
 ## 2026-07-28 — Boot loading screen + Google Maps location snapshot
 
 - **Boot loader**: `frontend/index.html` now has a critical-inline loading screen (pulsing Zarni mark + sweeping red/gold/blue gradient bar, matches the brand look already used on the login screen) shown from first paint until React mounts and overwrites `#root`. A matching `<BootLoader/>` component in `App.jsx` covers the same gap for the post-mount Firebase auth-check ("checking" state), which previously rendered a blank white screen.
