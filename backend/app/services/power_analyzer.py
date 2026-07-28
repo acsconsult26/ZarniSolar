@@ -185,10 +185,13 @@ def analyze_power_log(file_bytes: bytes, filename: str = "") -> dict:
         for bucket, vals in sorted(buckets.items())
     ]
 
+    date_range = f"{times[0].strftime('%d.%b.%y')} – {times[-1].strftime('%d.%b.%y')}"
+
     return {
         "sample_count": len(kw_series),
         "start_time": times[0].isoformat(),
         "end_time": times[-1].isoformat(),
+        "date_range": date_range,
         "avg_kw": _avg(kw_series),
         "peak_kw": _peak(kw_series),
         "avg_pf": _avg(pf_series),

@@ -207,6 +207,9 @@ def analyze_power_log_endpoint(project_id: str, field: str, file: UploadFile = F
     data = dict(project.get("data") or {})
     stats = {k: v for k, v in result.items() if k != "hourly"}
     data[f"{field}_stats"] = stats
+    # The slide subtitle field (e.g. analyzer_date_range) is derived from the
+    # log itself now, instead of being hand-entered.
+    data[f"{field}_date_range"] = result["date_range"]
     fdb.update("projects", project_id, {"uploads": uploads, "data": data})
 
     return {"stats": stats, "hourly": result["hourly"], "chart_url": storage.url_for(chart_path)}

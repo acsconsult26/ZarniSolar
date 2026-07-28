@@ -83,9 +83,7 @@ export const SECTIONS = [
   {
     key: "analyzer",
     title: "Power Analyzer (Slide 10)",
-    fields: [
-      { name: "analyzer_date_range", label: "Date Range (subtitle)", help: "Pick the survey start and end dates", type: "daterange" },
-    ],
+    fields: [],
     images: [{ name: "analyzer_image", label: "Power Analyzer Image" }],
     powerAnalyzer: { field: "analyzer" },
   },
@@ -101,7 +99,6 @@ export const SECTIONS = [
       { name: "second_transformer_kva", label: "Transformer Size (kVA)", type: "number" },
       { name: "second_generator_kva", label: "Generator (kVA)", type: "number" },
       { name: "second_pv_area_sqft", label: "PV Installation Area (sq ft)", type: "number" },
-      { name: "second_analyzer_date_range", label: "Power Analyzer Date Range (Slide 12)", type: "text" },
     ],
     images: [{ name: "second_analyzer_image", label: "Power Analyzer Image (Slide 12)" }],
     excelAnalyze: { avgField: "second_avg_units", peakField: "second_peak_units" },

@@ -40,9 +40,6 @@ function Field({ field, value, onChange }) {
       </div>
     );
   }
-  if (field.type === "daterange") {
-    return <DateRangeField field={field} value={value} onChange={onChange} />;
-  }
   if (field.type === "checkbox") {
     return (
       <label className="field toggle-row">
@@ -66,34 +63,6 @@ function Field({ field, value, onChange }) {
       {field.help && <small className="field-help">{field.help}</small>}
       <input type={field.type} value={value ?? ""} onChange={(e) => onChange(field.name, e.target.value)} />
     </label>
-  );
-}
-
-function formatDateShort(iso) {
-  if (!iso) return "";
-  const d = new Date(iso + "T00:00:00");
-  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }).replace(/ /g, ".");
-}
-
-function DateRangeField({ field, value, onChange }) {
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-
-  function emit(nextFrom, nextTo) {
-    onChange(field.name, [formatDateShort(nextFrom), formatDateShort(nextTo)].filter(Boolean).join(" – "));
-  }
-
-  return (
-    <div className="field">
-      <span className="field-label">{field.label}{field.required ? " *" : ""}</span>
-      {field.help && <small className="field-help">{field.help}</small>}
-      <div className="daterange-row">
-        <input type="date" value={from} onChange={(e) => { setFrom(e.target.value); emit(e.target.value, to); }} />
-        <span>to</span>
-        <input type="date" value={to} onChange={(e) => { setTo(e.target.value); emit(from, e.target.value); }} />
-      </div>
-      {value && <small className="field-help">{value}</small>}
-    </div>
   );
 }
 
@@ -258,6 +227,7 @@ function PowerAnalyzer({ config, projectId, data, uploads, setField, setUploads 
 
       {status === "done" && stats && (
         <div className="pa-result">
+          {stats.date_range && <p className="pa-date-range">Recorded {stats.date_range} (used as the slide subtitle)</p>}
           <div className="pa-stats-grid">
             {stat("kW", "avg_kw", "peak_kw", " kW")}
             {stat("PF", "avg_pf", "peak_pf")}
