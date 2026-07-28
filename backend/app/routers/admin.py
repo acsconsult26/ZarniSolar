@@ -14,10 +14,11 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 @router.get("/me")
 def me(user=Depends(get_current_user)):
-    was_new_login = user.get("last_login_at") is None or (
-        (datetime.datetime.utcnow() - user["last_login_at"]).total_seconds() > 60 * 30
-        if isinstance(user.get("last_login_at"), datetime.datetime) else True
-    )
+    last_login = user.get("last_login_at")
+    was_new_login = True
+    if isinstance(last_login, datetime.datetime):
+        now = datetime.datetime.now(last_login.tzinfo or datetime.timezone.utc)
+        was_new_login = (now - last_login).total_seconds() > 60 * 30
     fdb.update("users", user["uid"], {"last_login_at": datetime.datetime.utcnow()})
     if was_new_login:
         activity_log.log(user, "login")
