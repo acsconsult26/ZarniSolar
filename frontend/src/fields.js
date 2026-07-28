@@ -71,10 +71,7 @@ export const SECTIONS = [
     key: "data_result",
     title: "Surveying Data Result (Slide 9)",
     fields: [
-      { name: "max_load_kw", label: "Maximum Load Consumption (kWp)", help: "ဥပမာ — 48", type: "number" },
-      { name: "duration_hours", label: "Duration Hours (Hr)", help: "ဥပမာ — 18", type: "number" },
       { name: "voltage_v", label: "Line Voltage (V)", help: "ဥပမာ — 400", type: "number" },
-      { name: "power_factor", label: "Power Factor", help: "ဥပမာ — 0.88", type: "number" },
       { name: "transformer_kva", label: "Transformer Size (kVA)", help: "ဥပမာ — 315", type: "number" },
       { name: "generator_capacity_kva", label: "Generator (kVA)", help: "ဥပမာ — 110", type: "number" },
       { name: "pv_installation_area_sqft", label: "PV Installation Area (sq ft)", help: "ဥပမာ — 300", type: "number" },

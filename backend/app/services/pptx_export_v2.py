@@ -331,17 +331,21 @@ def _slide9_data_result(prs, client, v, imgs, company_name, page, prefix, title)
     def g(base):
         return v.get(f"{prefix}{base}") if prefix else v.get(base)
 
-    rows = [
-        ("Maximum Load Consumption", _fmt(g("max_load_kw"), " kWp")),
-        ("Duration Hours", _fmt(g("duration_hours"), " Hr")),
-        ("Line Voltage", _fmt(g("voltage_v"), " V")),
-        ("Power Factor", _fmt(g("power_factor"))),
-        ("Transformer Size", _fmt(g("transformer_kva"), " kVA")),
-        ("Generator", _fmt(g("generator_capacity_kva") if not prefix else g("generator_kva"), " kVA")),
-        ("PV Installation Area", _fmt(g("pv_installation_area_sqft") if not prefix else g("pv_area_sqft"), " sq ft")),
-        ("Average Consumption", _fmt(g("avg_units") if prefix else v.get("survey_avg_units"), " Units/day")),
-        ("Peak Consumption", _fmt(g("peak_units") if prefix else v.get("survey_peak_units"), " Units")),
-    ]
+    rows = []
+    if prefix:
+        # Only the optional Second Survey still collects these manually --
+        # the primary survey now derives consumption from the uploaded
+        # Excel/CSV file instead of asking for them.
+        rows.append(("Maximum Load Consumption", _fmt(g("max_load_kw"), " kWp")))
+        rows.append(("Duration Hours", _fmt(g("duration_hours"), " Hr")))
+    rows.append(("Line Voltage", _fmt(g("voltage_v"), " V")))
+    if prefix:
+        rows.append(("Power Factor", _fmt(g("power_factor"))))
+    rows.append(("Transformer Size", _fmt(g("transformer_kva"), " kVA")))
+    rows.append(("Generator", _fmt(g("generator_capacity_kva") if not prefix else g("generator_kva"), " kVA")))
+    rows.append(("PV Installation Area", _fmt(g("pv_installation_area_sqft") if not prefix else g("pv_area_sqft"), " sq ft")))
+    rows.append(("Average Consumption", _fmt(g("avg_units") if prefix else v.get("survey_avg_units"), " Units/day")))
+    rows.append(("Peak Consumption", _fmt(g("peak_units") if prefix else v.get("survey_peak_units"), " Units")))
     box = slide.shapes.add_textbox(Inches(0.9), top, Inches(7.2), prs.slide_height - top - Inches(0.9))
     tf = box.text_frame; T._no_autosize(tf)
     for i, (k, val) in enumerate(rows):

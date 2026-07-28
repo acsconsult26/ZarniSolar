@@ -179,7 +179,7 @@ def analyze_consumption_excel(project_id: str, file: UploadFile = File(...)):
     if not fdb.get("projects", project_id):
         raise HTTPException(404, "Project not found")
     try:
-        result = analyze_consumption(file.file.read())
+        result = analyze_consumption(file.file.read(), file.filename)
     except Exception as e:
         raise HTTPException(400, f"Could not analyze the spreadsheet: {e}")
     return result
