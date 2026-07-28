@@ -10,6 +10,7 @@ from ..services.excel_analysis import analyze_consumption
 from ..services.power_analyzer import analyze_power_log
 from ..services.chart_power_hourly import render_hourly_chart
 from ..services import imagegen
+from ..services.map_image import fetch_static_map, MapImageError
 from ..services.flowchart import render_priority_flowchart
 from ..services.text_drafts import compose_power_priority_draft
 from .. import boilerplate as bp
@@ -213,6 +214,24 @@ def analyze_power_log_endpoint(project_id: str, field: str, file: UploadFile = F
     fdb.update("projects", project_id, {"uploads": uploads, "data": data})
 
     return {"stats": stats, "hourly": result["hourly"], "chart_url": storage.url_for(chart_path)}
+
+
+@router.post("/{project_id}/fetch-map-image")
+def fetch_map_image_endpoint(project_id: str, lat: float, lng: float):
+    """Grabs a Google Static Maps satellite snapshot centered on the given
+    coordinates and stores it as the survey_image upload (slide 5)."""
+    project = fdb.get("projects", project_id)
+    if not project:
+        raise HTTPException(404, "Project not found")
+    try:
+        img_bytes = fetch_static_map(lat, lng)
+    except MapImageError as e:
+        raise HTTPException(400, str(e))
+    path = storage.save_bytes(img_bytes, "survey_map.png")
+    uploads = dict(project.get("uploads") or {})
+    uploads["survey_image"] = path
+    fdb.update("projects", project_id, {"uploads": uploads})
+    return {"url": storage.url_for(path)}
 
 
 @router.get("/{project_id}/slide21/draft")

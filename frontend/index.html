@@ -9,9 +9,41 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Padauk:wght@400;700&family=Noto+Sans+Myanmar:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>Zarni Solar — Proposal Generator</title>
+    <style>
+      /* Critical, inline: shown before the JS bundle loads, then wiped when
+         React mounts and replaces #root's contents (also reused as
+         <BootLoader /> for the post-mount auth-check gap, see App.jsx). */
+      #boot-loader {
+        position: fixed; inset: 0; z-index: 9999;
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.5rem;
+        background: #f5f7fa;
+      }
+      #boot-loader .bl-mark {
+        width: 64px; height: 64px; border-radius: 50%;
+        background: #fff; padding: 6px; box-sizing: border-box;
+        box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 4px 16px rgba(16,24,40,.06);
+        animation: bl-pulse 1.8s ease-in-out infinite;
+      }
+      #boot-loader .bl-mark img { width: 100%; height: 100%; object-fit: contain; }
+      #boot-loader .bl-bar { width: 140px; height: 3px; border-radius: 99px; background: #e6eaf0; overflow: hidden; position: relative; }
+      #boot-loader .bl-bar::after {
+        content: ""; position: absolute; inset: 0; width: 40%; border-radius: 99px;
+        background: linear-gradient(90deg, #e2231a, #f5c518, #1b4da1);
+        animation: bl-sweep 1.3s ease-in-out infinite;
+      }
+      #boot-loader .bl-label { font: 600 12px/1 "Inter", system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #6b7787; }
+      @keyframes bl-pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.08); opacity: .85; } }
+      @keyframes bl-sweep { 0% { left: -40%; } 100% { left: 100%; } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="boot-loader">
+        <div class="bl-mark"><img src="/zarni-logo.png" alt="" /></div>
+        <div class="bl-bar"></div>
+        <span class="bl-label">Loading</span>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

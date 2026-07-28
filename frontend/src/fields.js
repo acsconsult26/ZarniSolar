@@ -36,6 +36,7 @@ export const SECTIONS = [
       { name: "tilt_angle", label: "Tilt Angle (degrees)", help: "ဥပမာ — 22", type: "number" },
     ],
     images: [{ name: "survey_image", label: "Surveying Picture" }],
+    mapFetch: { latField: "survey_lat", lngField: "survey_lng", imageField: "survey_image" },
   },
   {
     key: "bill",

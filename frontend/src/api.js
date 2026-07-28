@@ -88,6 +88,11 @@ export const api = {
     }).then(json);
   },
 
+  fetchMapImage: (id, lat, lng) =>
+    fetch(`${API_BASE}/projects/${id}/fetch-map-image?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`, {
+      method: "POST", headers: authHeaders(),
+    }).then(json),
+
   previewFlowchartUrl: (id) => `${API_BASE}/projects/${id}/slide20/preview?t=${Date.now()}`,
 
   exportProject: async (id) => {

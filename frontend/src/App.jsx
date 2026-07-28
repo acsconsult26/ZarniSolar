@@ -70,6 +70,10 @@ function ImageUpload({ image, projectId, onUploaded, currentUrl }) {
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState(currentUrl);
 
+  // Picks up updates from outside this component too (e.g. the map-fetch
+  // button writing straight into `uploads`), not just its own file input.
+  useEffect(() => { setPreview(currentUrl); }, [currentUrl]);
+
   async function handleFile(e) {
     const file = e.target.files[0];
     if (!file || !projectId) return;
@@ -142,6 +146,38 @@ function ExcelAnalyze({ config, projectId, data, setField }) {
       {(avg != null && avg !== "") && (
         <p className="excel-confirmed">In slide → Average {avg} units · Peak {peak} units</p>
       )}
+    </div>
+  );
+}
+
+function MapFetchButton({ config, projectId, data, setUploads }) {
+  const [status, setStatus] = useState("idle"); // idle | busy | error
+  const [error, setError] = useState(null);
+  const lat = data[config.latField];
+  const lng = data[config.lngField];
+  const ready = lat !== undefined && lat !== "" && lng !== undefined && lng !== "";
+
+  async function fetchMap() {
+    if (!ready || !projectId) return;
+    setStatus("busy");
+    setError(null);
+    try {
+      const result = await api.fetchMapImage(projectId, lat, lng);
+      setUploads((u) => ({ ...u, [config.imageField]: result.url }));
+      setStatus("idle");
+    } catch (err) {
+      setError(String(err));
+      setStatus("error");
+    }
+  }
+
+  return (
+    <div className="map-fetch">
+      <button type="button" className="map-fetch-btn" onClick={fetchMap} disabled={!ready || status === "busy"}>
+        {status === "busy" ? "Fetching map…" : "📍 Get Map Image from Coordinates"}
+      </button>
+      {!ready && <small className="field-help">Enter latitude &amp; longitude above first.</small>}
+      {status === "error" && <p className="error">{error}</p>}
     </div>
   );
 }
@@ -651,6 +687,10 @@ function ProposalForm({ initialProject, onExitToPicker }) {
                   );
                 })()}
 
+                {section.mapFetch && (
+                  <MapFetchButton config={section.mapFetch} projectId={projectId} data={data} setUploads={setUploads} />
+                )}
+
                 {section.excelAnalyze && (
                   <ExcelAnalyze config={section.excelAnalyze} projectId={projectId} data={data} setField={setField} />
                 )}
@@ -706,6 +746,16 @@ function ProposalForm({ initialProject, onExitToPicker }) {
   );
 }
 
+function BootLoader() {
+  return (
+    <div className="boot-loader">
+      <div className="bl-mark"><img src="/zarni-logo.png" alt="" /></div>
+      <div className="bl-bar" />
+      <span className="bl-label">Loading</span>
+    </div>
+  );
+}
+
 export default function App() {
   const [authState, setAuthState] = useState("checking"); // checking | out | in
   const [user, setUser] = useState(null);
@@ -745,7 +795,7 @@ export default function App() {
     });
   }
 
-  if (authState === "checking") return null;
+  if (authState === "checking") return <BootLoader />;
   if (authState === "out") return <Login />;
 
   const isAdmin = user?.role === "admin";
