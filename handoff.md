@@ -4,6 +4,13 @@ Running log of notable changes for AI tooling/session continuity. Newest entries
 
 ---
 
+## 2026-07-28 — Boot loading screen + Google Maps location snapshot
+
+- **Boot loader**: `frontend/index.html` now has a critical-inline loading screen (pulsing Zarni mark + sweeping red/gold/blue gradient bar, matches the brand look already used on the login screen) shown from first paint until React mounts and overwrites `#root`. A matching `<BootLoader/>` component in `App.jsx` covers the same gap for the post-mount Firebase auth-check ("checking" state), which previously rendered a blank white screen.
+- **Google Maps location snapshot** (Surveying Data step, slide 5): new "📍 Get Map Image from Coordinates" button, enabled once lat/lng are filled in. Backend (`backend/app/services/map_image.py`, new endpoint `POST /projects/{id}/fetch-map-image`) fetches a Google Static Maps satellite image centered on the coordinates and stores it as the existing `survey_image` upload — reuses the slide 5 image slot as-is, no pptx export changes needed. **Requires `GOOGLE_MAPS_API_KEY` to be set on the Cloud Run backend** (enable "Maps Static API" in Google Cloud Console for the `zarni-solar-proposal-1c2b9` project, generate a key, `gcloud run services update zarni-solar-backend --set-env-vars GOOGLE_MAPS_API_KEY=...`) — until then the button fails with a clear "not configured" error; nothing else is affected.
+
+---
+
 ## 2026-07-28 — Power Analyzer date range is now derived from the uploaded log
 
 - Removed the manual "Date Range" date-range picker from the Power Analyzer step (and the optional Second Survey's analyzer step) — the uploaded trend log already has start/end timestamps, so `analyze_power_log()` now returns a formatted `date_range` string ("22.May.26 – 24.May.26") and the analyze-power-log endpoint writes it directly into `analyzer_date_range` / `second_analyzer_date_range`, the same fields the pptx export already reads for the slide subtitle. The now-unused `daterange` field type/`DateRangeField` component were removed from `fields.js`/`App.jsx`.
