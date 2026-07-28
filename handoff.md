@@ -4,6 +4,12 @@ Running log of notable changes for AI tooling/session continuity. Newest entries
 
 ---
 
+## 2026-07-28 — Power Analyzer date range is now derived from the uploaded log
+
+- Removed the manual "Date Range" date-range picker from the Power Analyzer step (and the optional Second Survey's analyzer step) — the uploaded trend log already has start/end timestamps, so `analyze_power_log()` now returns a formatted `date_range` string ("22.May.26 – 24.May.26") and the analyze-power-log endpoint writes it directly into `analyzer_date_range` / `second_analyzer_date_range`, the same fields the pptx export already reads for the slide subtitle. The now-unused `daterange` field type/`DateRangeField` component were removed from `fields.js`/`App.jsx`.
+
+---
+
 ## 2026-07-28 — Power Analyzer CSV/Excel analysis feature + fixed a login-crashing CORS false alarm
 
 - **Fixed `/admin/me` login crash**: comparing Firestore's timezone-aware `last_login_at` against `datetime.utcnow()` (naive) raised an unhandled `TypeError`. Since it was unhandled, it bypassed FastAPI's CORS middleware entirely, so the browser only reported a missing `Access-Control-Allow-Origin` header instead of the real 500 — not an actual CORS misconfiguration. Fixed in `backend/app/routers/admin.py`.
