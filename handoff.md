@@ -4,6 +4,12 @@ Running log of notable changes for AI tooling/session continuity. Newest entries
 
 ---
 
+## 2026-07-28 — Power Analyzer Avg kW feeds ROI's Total EPC Usage auto-fill
+
+- The ROI step's "Total EPC Usage (Units/day)" auto-fill (`App.jsx`) now also falls back to the Power Analyzer's Avg kW × 24h as a daily-usage estimate when the Electricity Bill step's Total EPC Units hasn't been entered — same fill-if-empty behavior as the existing bill-derived auto-fill, never overrides a value the user set.
+
+---
+
 ## 2026-07-28 — Removed consumption Excel analyzer (steps 8/10) and Power Analyzer log/image from step 10
 
 - Dropped "Consumption Excel (hourly units)" from both Surveying Data Result (step 8) and the Second Survey (step 10), and dropped the Power Analyzer CSV/Excel log upload + Power Analyzer Image (slide 12) from the Second Survey. The primary Power Analyzer step (step 9) is untouched.
