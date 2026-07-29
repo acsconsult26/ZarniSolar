@@ -471,13 +471,21 @@ function ProposalForm({ initialProject, onExitToPicker }) {
 
   // Carry the Electricity Bill numbers (total EPC units + derived unit cost)
   // into the ROI / Payback steps as defaults, so the same figures don't need
-  // to be retyped -- only fills fields the user hasn't already set.
+  // to be retyped -- only fills fields the user hasn't already set. Falls
+  // back to the Power Analyzer's Avg kW × 24h (a daily-usage estimate) when
+  // the bill's Total EPC Units hasn't been entered.
   useEffect(() => {
     const unitCost = perUnitCost(data);
+    const analyzerAvgKw = data.analyzer_stats?.avg_kw;
+    const analyzerDailyUnits = analyzerAvgKw != null ? Math.round(analyzerAvgKw * 24) : null;
     setData((d) => {
       const patch = {};
-      if ((d.roi_total_epc_units === undefined || d.roi_total_epc_units === "") && d.total_epc_units) {
-        patch.roi_total_epc_units = d.total_epc_units;
+      if (d.roi_total_epc_units === undefined || d.roi_total_epc_units === "") {
+        if (d.total_epc_units) {
+          patch.roi_total_epc_units = d.total_epc_units;
+        } else if (analyzerDailyUnits) {
+          patch.roi_total_epc_units = analyzerDailyUnits;
+        }
       }
       if ((d.roi_avg_unit_cost === undefined || d.roi_avg_unit_cost === "") && unitCost) {
         patch.roi_avg_unit_cost = unitCost;
@@ -488,7 +496,7 @@ function ProposalForm({ initialProject, onExitToPicker }) {
       return Object.keys(patch).length ? { ...d, ...patch } : d;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data.total_epc_units, data.total_epc_cost]);
+  }, [data.total_epc_units, data.total_epc_cost, data.analyzer_stats]);
 
   async function saveDraft() {
     if (!projectId) return;
