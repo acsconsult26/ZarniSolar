@@ -4,6 +4,13 @@ Running log of notable changes for AI tooling/session continuity. Newest entries
 
 ---
 
+## 2026-07-28 — Removed consumption Excel analyzer (steps 8/10) and Power Analyzer log/image from step 10
+
+- Dropped "Consumption Excel (hourly units)" from both Surveying Data Result (step 8) and the Second Survey (step 10), and dropped the Power Analyzer CSV/Excel log upload + Power Analyzer Image (slide 12) from the Second Survey. The primary Power Analyzer step (step 9) is untouched.
+- Removed the now-unused backend consumption-analyzer service/endpoint (`excel_analysis.py`, `POST /projects/{id}/analyze-consumption`) and the `ExcelAnalyze` frontend component, and dropped the second-survey analyzer/chart slide generation in `pptx_export_v2.py` since nothing populates those fields anymore.
+
+---
+
 ## 2026-07-28 — Fixed OOM crash on large CSV uploads (was surfacing as a false CORS error)
 
 - Uploading a large (~25MB) CSV to step 8's consumption analyzer crashed the backend with an unhandled OOM kill, which the browser reported as a CORS error (no `Access-Control-Allow-Origin` header) — same failure class as the earlier `/admin/me` crash: an unhandled server-side failure bypasses FastAPI's CORS middleware entirely.
