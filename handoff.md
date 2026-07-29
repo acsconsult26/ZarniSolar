@@ -4,6 +4,14 @@ Running log of notable changes for AI tooling/session continuity. Newest entries
 
 ---
 
+## 2026-07-28 — Fixed OOM crash on large CSV uploads (was surfacing as a false CORS error)
+
+- Uploading a large (~25MB) CSV to step 8's consumption analyzer crashed the backend with an unhandled OOM kill, which the browser reported as a CORS error (no `Access-Control-Allow-Origin` header) — same failure class as the earlier `/admin/me` crash: an unhandled server-side failure bypasses FastAPI's CORS middleware entirely.
+- Root cause: `analyze_consumption` (`backend/app/services/excel_analysis.py`) built one full Python list of values per spreadsheet column just to score which column looks like the consumption series — on a wide CSV this multiplied memory usage by the column count. Rewrote to a single-pass per-column counter instead.
+- Also bumped the Cloud Run service (`zarni-solar-backend`) from the default 512Mi to **1Gi memory** for headroom on large files (`gcloud run services update zarni-solar-backend --memory 1Gi`).
+
+---
+
 ## 2026-07-28 — Fixed CSV upload crash; simplified Surveying Data Result step
 
 - **Fixed**: uploading a CSV on step 8 (Surveying Data Result)'s consumption analyzer threw `400: File is not a zip file`, because `analyze_consumption` only ever called `openpyxl.load_workbook` (xlsx-only, requires a zip container). `backend/app/services/excel_analysis.py` now detects CSV vs Excel by filename and falls back to CSV parsing if openpyxl can't open the file.
