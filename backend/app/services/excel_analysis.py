@@ -53,15 +53,21 @@ def analyze_consumption(file_bytes: bytes, filename: str = "") -> dict:
 
     ncols = max((len(r) for r in rows), default=0)
 
-    # Score each column: prefer header hint, then count of numeric values
+    # Score each column by count of numeric values -- single pass building
+    # per-column counters, not a full list-of-values per column (which on a
+    # wide, many-row file multiplies memory by the column count).
+    counts = [0] * ncols
+    for r in data_rows:
+        for col in range(min(ncols, len(r))):
+            if _numeric(r[col]) is not None:
+                counts[col] += 1
+
     best_col = None
     best_score = -1
     for col in range(ncols):
-        values = [_numeric(r[col]) for r in data_rows if col < len(r)]
-        nums = [v for v in values if v is not None]
-        if not nums:
+        if counts[col] == 0:
             continue
-        score = len(nums)
+        score = counts[col]
         if header_is_text and col < len(header) and isinstance(header[col], str):
             if any(h in header[col].lower() for h in CONSUMPTION_HINTS):
                 score += 100000  # strongly prefer a hinted column
