@@ -86,13 +86,6 @@ def export_project_v2(project, storage, company_info=None, selected_products=Non
     if data.get("include_second_survey"):
         _slide9_data_result(prs, client, v, imgs, company_name, page=11, prefix="second_",
                             title="Surveying Data Result (Other Meters)")
-        _slide10_analyzer(prs, client, v.get("second_analyzer_date_range"),
-                          imgs.get("second_analyzer_image"), company_name, page=12)
-        if imgs.get("second_analyzer_chart"):
-            page = len(prs.slides._sldIdLst) + 1
-            _slide_analyzer_stats(prs, f"Power Analyzer (Other Meters) — Hourly Load Profile",
-                                  data.get("second_analyzer_stats"), imgs.get("second_analyzer_chart"),
-                                  company_name, page)
 
     # Slides 13-14 : System Requirement options (up to 4, 2 per slide)
     options = [o for o in (data.get("system_options") or [])

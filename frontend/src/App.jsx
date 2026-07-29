@@ -96,60 +96,6 @@ function ImageUpload({ image, projectId, onUploaded, currentUrl }) {
   );
 }
 
-function ExcelAnalyze({ config, projectId, data, setField }) {
-  const [status, setStatus] = useState(null); // null | 'processing' | 'done' | 'error'
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
-
-  const avg = data[config.avgField];
-  const peak = data[config.peakField];
-
-  async function handleFile(e) {
-    const file = e.target.files[0];
-    if (!file || !projectId) return;
-    setStatus("processing");
-    setError(null);
-    setResult(null);
-    try {
-      const r = await api.analyzeConsumption(projectId, file);
-      setResult(r);
-      setStatus("done");
-    } catch (err) {
-      setError(String(err));
-      setStatus("error");
-    }
-  }
-
-  function confirm() {
-    if (!result) return;
-    setField(config.avgField, result.average_units);
-    setField(config.peakField, result.peak_units);
-  }
-
-  return (
-    <div className="excel-analyze">
-      <h3>Consumption Excel (hourly units)</h3>
-      <p className="hint">Upload an Excel file of hourly consumption. It is analyzed for average &amp; peak units. Review, then confirm to include in the slide.</p>
-      <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} />
-      {status === "processing" && <p className="processing">Processing calculation…</p>}
-      {status === "error" && <p className="error">{error}</p>}
-      {status === "done" && result && (
-        <div className="excel-result">
-          <div className="excel-figs">
-            <span><strong>Average:</strong> {result.average_units} units</span>
-            <span><strong>Peak:</strong> {result.peak_units} units</span>
-            <span className="muted">({result.sample_count} rows{result.column ? `, "${result.column}"` : ""})</span>
-          </div>
-          <button type="button" className="confirm-btn" onClick={confirm}>✓ Correct — use these values</button>
-        </div>
-      )}
-      {(avg != null && avg !== "") && (
-        <p className="excel-confirmed">In slide → Average {avg} units · Peak {peak} units</p>
-      )}
-    </div>
-  );
-}
-
 function MapFetchButton({ config, projectId, data, setUploads }) {
   const [status, setStatus] = useState("idle"); // idle | busy | error
   const [error, setError] = useState(null);
@@ -689,10 +635,6 @@ function ProposalForm({ initialProject, onExitToPicker }) {
 
                 {section.mapFetch && (
                   <MapFetchButton config={section.mapFetch} projectId={projectId} data={data} setUploads={setUploads} />
-                )}
-
-                {section.excelAnalyze && (
-                  <ExcelAnalyze config={section.excelAnalyze} projectId={projectId} data={data} setField={setField} />
                 )}
 
                 {section.powerAnalyzer && (

@@ -76,7 +76,6 @@ export const SECTIONS = [
       { name: "generator_capacity_kva", label: "Generator (kVA)", help: "ဥပမာ — 110", type: "number" },
       { name: "pv_installation_area_sqft", label: "PV Installation Area (sq ft)", help: "ဥပမာ — 300", type: "number" },
     ],
-    excelAnalyze: { avgField: "survey_avg_units", peakField: "survey_peak_units" },
   },
   {
     key: "analyzer",
@@ -98,9 +97,6 @@ export const SECTIONS = [
       { name: "second_generator_kva", label: "Generator (kVA)", type: "number" },
       { name: "second_pv_area_sqft", label: "PV Installation Area (sq ft)", type: "number" },
     ],
-    images: [{ name: "second_analyzer_image", label: "Power Analyzer Image (Slide 12)" }],
-    excelAnalyze: { avgField: "second_avg_units", peakField: "second_peak_units" },
-    powerAnalyzer: { field: "second_analyzer" },
   },
   {
     key: "options",

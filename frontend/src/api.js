@@ -74,12 +74,6 @@ export const api = {
 
   slide21Draft: (id) => fetch(`${API_BASE}/projects/${id}/slide21/draft`, { headers: authHeaders() }).then(json),
 
-  analyzeConsumption: (id, file) => {
-    const fd = new FormData();
-    fd.append("file", file);
-    return fetch(`${API_BASE}/projects/${id}/analyze-consumption`, { method: "POST", headers: authHeaders(), body: fd }).then(json);
-  },
-
   analyzePowerLog: (id, field, file) => {
     const fd = new FormData();
     fd.append("file", file);

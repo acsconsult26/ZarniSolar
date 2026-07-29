@@ -6,7 +6,6 @@ from .. import firestore_db as fdb
 from ..storage import storage
 from ..schema import merged_field_values
 from ..services.pptx_export_v2 import export_project_v2
-from ..services.excel_analysis import analyze_consumption
 from ..services.power_analyzer import analyze_power_log
 from ..services.chart_power_hourly import render_hourly_chart
 from ..services import imagegen
@@ -172,17 +171,6 @@ def upload_slide19_fallback(project_id: str, file: UploadFile = File(...)):
     path = storage.save_bytes(file.file.read(), file.filename)
     fdb.update("projects", project_id, {"slide19_image_path": path})
     return {"url": storage.url_for(path)}
-
-
-@router.post("/{project_id}/analyze-consumption")
-def analyze_consumption_excel(project_id: str, file: UploadFile = File(...)):
-    if not fdb.get("projects", project_id):
-        raise HTTPException(404, "Project not found")
-    try:
-        result = analyze_consumption(file.file.read(), file.filename)
-    except Exception as e:
-        raise HTTPException(400, f"Could not analyze the spreadsheet: {e}")
-    return result
 
 
 @router.post("/{project_id}/analyze-power-log")
