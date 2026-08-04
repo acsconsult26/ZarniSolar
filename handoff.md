@@ -4,6 +4,17 @@ Running log of notable changes for AI tooling/session continuity. Newest entries
 
 ---
 
+## 2026-07-29 — Slides 29-34 built (Technical Advantages, Mounting Structure, Warranty templates)
+
+Closes out the 35-slide MRTV reference deck redesign except slide 35 (Thank You, not yet built — trivial, not requested this round).
+
+- **Slides 29-30 (Technical Advantages)**: new `tech_advantages` form section, two rich-text fields (`fields.js`), each rendered as its own slide via new `_slide_richtext_block()` in `pptx_export_v2.py`.
+- **Slides 31-33 (Mounting Structure)**: new `mounting_structure` form section — up to 2 design photos (slide 31, `_slide_photo_row`) plus two "priority install area" photo+note slides (32-33, new `_slide_image_note()`).
+- **Slide 34 (Warranty)**: new `warranty_templates` boilerplate key — named, admin-managed templates (`WarrantyTemplatesCard` in `Admin.jsx` → Settings, replaces the old single global `warranty_lines` textarea which the v2 exporter never actually read). Proposal form gets a new `warranty-select` field type (`WarrantySelect` in `App.jsx`) to pick which template applies; resolved server-side at export time (`projects.py`) by `warranty_template_id` and rendered via new `_slide_bullets()`.
+- Verified all three new slide-generation code paths end-to-end with a standalone `export_project_v2()` test (rich text/bold parsing, image-vs-placeholder fallback, notes, bullets) before wiring into the live export pipeline — caught nothing, all correct on first pass.
+
+---
+
 ## 2026-07-28 — Power Analyzer Avg kW feeds ROI's Total EPC Usage auto-fill
 
 - The ROI step's "Total EPC Usage (Units/day)" auto-fill (`App.jsx`) now also falls back to the Power Analyzer's Avg kW × 24h as a daily-usage estimate when the Electricity Bill step's Total EPC Units hasn't been entered — same fill-if-empty behavior as the existing bill-derived auto-fill, never overrides a value the user set.
