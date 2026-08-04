@@ -27,9 +27,31 @@ function ProductSelect({ field, value, onChange }) {
   );
 }
 
+function WarrantySelect({ field, value, onChange }) {
+  const [templates, setTemplates] = useState([]);
+  useEffect(() => {
+    api.getBoilerplate("warranty_templates").then((t) => setTemplates(t || [])).catch(() => {});
+  }, []);
+  return (
+    <label className="field">
+      <span className="field-label">{field.label}</span>
+      {field.help && <small className="field-help">{field.help}</small>}
+      <select value={value ?? ""} onChange={(e) => onChange(field.name, e.target.value)}>
+        <option value="">— none —</option>
+        {templates.map((t) => (
+          <option key={t.id} value={t.id}>{t.name}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function Field({ field, value, onChange }) {
   if (field.type === "product-select") {
     return <ProductSelect field={field} value={value} onChange={onChange} />;
+  }
+  if (field.type === "warranty-select") {
+    return <WarrantySelect field={field} value={value} onChange={onChange} />;
   }
   if (field.type === "richtext") {
     return (

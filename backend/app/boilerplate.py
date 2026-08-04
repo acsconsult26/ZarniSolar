@@ -21,6 +21,20 @@ BOILERPLATE_DEFAULTS = {
         "Sigenergy Battery 12kWh, 5+5 Years Warranty (Replacement)",
         "Sigenergy GateWay Home SP - 2 Years Services Warranty",
     ],
+    # Named warranty templates (slide 34) -- the proposal form lets the user
+    # pick one per project instead of hand-typing warranty lines each time.
+    "warranty_templates": [
+        {
+            "id": "standard",
+            "name": "Standard Warranty",
+            "lines": [
+                "Sigenergy Inverter + Battery - 5 Years Full Warranty (Replacement)",
+                "Sigenergy GateWay - 2 Years Service Warranty",
+                "Solar Panel - 15 Years Warranty",
+                "Installation (ZARNI Electronics) - 1 Year Warranty",
+            ],
+        },
+    ],
     "closing_statement": "Zarni Electronic မှ တပ်ဆင်ပေးထားသော Sigenergy Brand သည် တပ်ဆင်ထားသည်မှ ယနေ့အချိန်...",
     "reference_projects": [],
     "reference_sites_table": [],

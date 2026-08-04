@@ -249,9 +249,16 @@ def export(project_id: str):
     company_info = bp.read("company_info")
     selected_products = _gather_selected_products(project.get("data") or {})
     closing_statement = bp.read("closing_statement")
+    warranty_template_id = (project.get("data") or {}).get("warranty_template_id")
+    warranty_lines = None
+    if warranty_template_id:
+        templates = bp.read("warranty_templates") or []
+        template = next((t for t in templates if t.get("id") == warranty_template_id), None)
+        warranty_lines = template.get("lines") if template else None
     pptx_bytes = export_project_v2(
         _ProjectView(project), storage, company_info=company_info,
         selected_products=selected_products, closing_statement=closing_statement,
+        warranty_lines=warranty_lines,
     )
     # track export stats (month bucket) for the dashboard
     stats = dict(bp.read("export_stats") or {})

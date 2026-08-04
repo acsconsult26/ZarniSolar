@@ -809,16 +809,70 @@ function DashboardTab({ onGoTo }) {
   );
 }
 
+function WarrantyTemplatesCard({ token }) {
+  const [templates, setTemplates] = useState(null);
+  const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    api.getBoilerplate("warranty_templates").then((t) => setTemplates(t || [])).catch(() => setTemplates([]));
+  }, []);
+
+  function addTemplate() {
+    setTemplates((t) => [
+      ...(t || []),
+      { id: `template_${Date.now().toString(36)}`, name: `Template ${(t?.length || 0) + 1}`, lines: [] },
+    ]);
+  }
+  function updateTemplate(i, patch) {
+    setTemplates((t) => t.map((tpl, idx) => (idx === i ? { ...tpl, ...patch } : tpl)));
+  }
+  function removeTemplate(i) {
+    if (!confirm("Delete this warranty template?")) return;
+    setTemplates((t) => t.filter((_, idx) => idx !== i));
+  }
+  async function save() {
+    await api.putBoilerplate(token, "warranty_templates", templates);
+    setStatus("Warranty templates saved — pick one per proposal on the Warranty step.");
+    setTimeout(() => setStatus(""), 4000);
+  }
+
+  if (templates === null) return <div className="admin-card"><p className="hint">Loading warranty templates…</p></div>;
+
+  return (
+    <div className="admin-card">
+      <h3>Warranty Templates (Slide 34)</h3>
+      <p className="hint">Save named warranty templates — staff pick one per proposal on the Warranty step.</p>
+      {templates.map((tpl, i) => (
+        <div key={tpl.id} className="branch-block">
+          <div className="row" style={{ alignItems: "center" }}>
+            <label style={{ flex: 1 }}><span>Name</span>
+              <input value={tpl.name} onChange={(e) => updateTemplate(i, { name: e.target.value })} />
+            </label>
+            <button type="button" onClick={() => removeTemplate(i)}>Delete</button>
+          </div>
+          <label><span>Warranty lines (one per line)</span>
+            <textarea rows={4} value={(tpl.lines || []).join("\n")}
+                     onChange={(e) => updateTemplate(i, { lines: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean) })} />
+          </label>
+        </div>
+      ))}
+      <div className="row">
+        <button type="button" onClick={addTemplate}>+ Add Template</button>
+        <button onClick={save}>Save Templates</button>
+      </div>
+      {status && <p className="hint">{status}</p>}
+    </div>
+  );
+}
+
 function SettingsTab({ token }) {
   const [company, setCompany] = useState(null);
-  const [warranty, setWarranty] = useState("");
   const [prompt, setPrompt] = useState("");
   const [closing, setClosing] = useState("");
   const [status, setStatus] = useState("");
 
   useEffect(() => {
     api.getBoilerplate("company_info").then(setCompany).catch(() => {});
-    api.getBoilerplate("warranty_lines").then((l) => setWarranty((l || []).join("\n"))).catch(() => {});
     api.getBoilerplate("slide19_prompt_template").then((p) => setPrompt(typeof p === "string" ? p : "")).catch(() => {});
     api.getBoilerplate("closing_statement").then((c) => setClosing(typeof c === "string" ? c : "")).catch(() => {});
   }, []);
@@ -834,10 +888,6 @@ function SettingsTab({ token }) {
   async function saveCompany() {
     await api.putBoilerplate(token, "company_info", company);
     flash("Company info saved — appears on slide 2 (Company/Branches).");
-  }
-  async function saveWarranty() {
-    await api.putBoilerplate(token, "warranty_lines", warranty.split("\n").map((s) => s.trim()).filter(Boolean));
-    flash("Warranty defaults saved — used on slide 22 when no product warranty is selected.");
   }
   async function savePrompt() {
     await api.putBoilerplate(token, "slide19_prompt_template", prompt);
@@ -871,12 +921,7 @@ function SettingsTab({ token }) {
         <div className="row"><button onClick={saveCompany}>Save Company Info</button></div>
       </div>
 
-      <div className="admin-card">
-        <h3>Default Warranty Lines (Slide 22)</h3>
-        <p className="hint">Used when a proposal has no catalog products with warranty. One line each.</p>
-        <textarea rows={5} value={warranty} onChange={(e) => setWarranty(e.target.value)} />
-        <div className="row"><button onClick={saveWarranty}>Save Warranty</button></div>
-      </div>
+      <WarrantyTemplatesCard token={token} />
 
       <div className="admin-card">
         <h3>Slide-19 AI Prompt Template</h3>

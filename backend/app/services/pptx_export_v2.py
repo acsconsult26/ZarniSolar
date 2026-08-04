@@ -53,7 +53,7 @@ class _Imgs:
 
 
 def export_project_v2(project, storage, company_info=None, selected_products=None,
-                      closing_statement=None) -> bytes:
+                      closing_statement=None, warranty_lines=None) -> bytes:
     data = project.data or {}
     v = merged_field_values(data)
     ci = company_info or {}
@@ -181,6 +181,32 @@ def export_project_v2(project, storage, company_info=None, selected_products=Non
             page = len(prs.slides._sldIdLst) + 1
             image = _product_image(storage, product)
             _slide_product_spec(prs, title, product, image, company_name, page)
+
+    # Slides 29-30 : Technical Advantages (free-form, filled per-proposal)
+    for key in ("tech_advantages_1", "tech_advantages_2"):
+        html = data.get(key)
+        if html:
+            page = len(prs.slides._sldIdLst) + 1
+            _slide_richtext_block(prs, "Technical Advantages", html, company_name, page)
+
+    # Slide 31 : Solar Support Mounting Structure -- design images
+    mount_design_imgs = [imgs.get("mounting_design_1"), imgs.get("mounting_design_2")]
+    if any(mount_design_imgs):
+        page = len(prs.slides._sldIdLst) + 1
+        _slide_photo_row(prs, "Solar Support Mounting Structure — Design", mount_design_imgs, company_name, page)
+
+    # Slides 32-33 : Solar Priority Install Area 1 & 2 (image + note)
+    for idx, label in ((1, "Solar Priority Install Area 1"), (2, "Solar Priority Install Area 2")):
+        img = imgs.get(f"mounting_area_{idx}_image")
+        note = data.get(f"mounting_area_{idx}_note")
+        if img or note:
+            page = len(prs.slides._sldIdLst) + 1
+            _slide_image_note(prs, label, img, note, company_name, page)
+
+    # Slide 34 : Warranty (admin-managed template, chosen per-proposal)
+    if warranty_lines:
+        page = len(prs.slides._sldIdLst) + 1
+        _slide_bullets(prs, "Warranty", warranty_lines, company_name, page)
 
     import io
     out = io.BytesIO()
@@ -416,6 +442,45 @@ def _slide_closing_statement(prs, text, company_name, page):
     blocks = parse_html(text)
     T.add_richtext(slide, blocks, Inches(0.9), top, prs.slide_width - Inches(1.8),
                    prs.slide_height - top - Inches(0.8), size=16)
+
+
+def _slide_richtext_block(prs, title, html, company_name, page):
+    """Generic single-richtext-block slide (Technical Advantages 29-30)."""
+    slide = T.add_slide(prs, page=page, company_name=company_name)
+    top = T.add_title(slide, prs, title)
+    blocks = parse_html(html)
+    T.add_richtext(slide, blocks, Inches(0.9), top, prs.slide_width - Inches(1.8),
+                   prs.slide_height - top - Inches(0.8), size=16)
+
+
+def _slide_image_note(prs, title, image, note, company_name, page):
+    """Image (left) + a short caption/measurement note (right) -- the two
+    Solar Priority Install Area slides (32-33)."""
+    slide = T.add_slide(prs, page=page, company_name=company_name)
+    top = T.add_title(slide, prs, title)
+    body_h = prs.slide_height - top - Inches(0.8)
+    if image:
+        T.add_image_contain(slide, image, Inches(0.7), top, Inches(7.5), body_h)
+    else:
+        _placeholder(slide, Inches(0.7), top, Inches(7.5), body_h)
+    if note:
+        T.add_text(slide, note, Inches(8.5), top, prs.slide_width - Inches(9.2), body_h,
+                   size=18, bold=True, color=T.WHITE, anchor=MSO_ANCHOR.MIDDLE)
+
+
+def _slide_bullets(prs, title, lines, company_name, page):
+    """Simple bulleted-line slide (Warranty, slide 34)."""
+    slide = T.add_slide(prs, page=page, company_name=company_name)
+    top = T.add_title(slide, prs, title)
+    box = slide.shapes.add_textbox(Inches(0.9), top, prs.slide_width - Inches(1.8),
+                                   prs.slide_height - top - Inches(0.9))
+    tf = box.text_frame
+    T._no_autosize(tf)
+    for i, line in enumerate(lines):
+        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        p.space_after = Pt(14)
+        run = p.add_run()
+        T._apply_run(run, f"•  {line}", size=17, bold=False, italic=False, color=T.WHITE, font=T.FONT)
 
 
 def _product_image(storage, product):

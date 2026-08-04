@@ -184,6 +184,44 @@ export const PRODUCT_SPEC_SECTION = {
 };
 SECTIONS.push(PRODUCT_SPEC_SECTION);
 
+export const TECH_ADVANTAGES_SECTION = {
+  key: "tech_advantages",
+  title: "Technical Advantages (Slides 29-30)",
+  note: "Free-form write-up of the system's technical advantages. Each box becomes its own slide; leave either blank to skip it.",
+  fields: [
+    { name: "tech_advantages_1", label: "Technical Advantages — Part 1 (Slide 29)", type: "richtext" },
+    { name: "tech_advantages_2", label: "Technical Advantages — Part 2 (Slide 30)", type: "richtext" },
+  ],
+};
+SECTIONS.push(TECH_ADVANTAGES_SECTION);
+
+export const MOUNTING_STRUCTURE_SECTION = {
+  key: "mounting_structure",
+  title: "Solar Support Mounting Structure (Slides 31-33)",
+  note: "Design photos (slide 31) and up to two priority install-area photos with a measurement note (slides 32-33), e.g. \"90×90 ft = 188 panels\".",
+  fields: [
+    { name: "mounting_area_1_note", label: "Install Area 1 — Note (Slide 32)", help: "ဥပမာ — 90×90 ft = 188 panels", type: "text" },
+    { name: "mounting_area_2_note", label: "Install Area 2 — Note (Slide 33)", help: "ဥပမာ — 35×200 ft = 180 panels", type: "text" },
+  ],
+  images: [
+    { name: "mounting_design_1", label: "Mounting Structure Design — Photo 1 (Slide 31)" },
+    { name: "mounting_design_2", label: "Mounting Structure Design — Photo 2 (Slide 31)" },
+    { name: "mounting_area_1_image", label: "Install Area 1 — Photo (Slide 32)" },
+    { name: "mounting_area_2_image", label: "Install Area 2 — Photo (Slide 33)" },
+  ],
+};
+SECTIONS.push(MOUNTING_STRUCTURE_SECTION);
+
+export const WARRANTY_SECTION = {
+  key: "warranty",
+  title: "Service Warranty (Slide 34)",
+  note: "Warranty templates are managed in Admin → Settings. Pick which one applies to this proposal.",
+  fields: [
+    { name: "warranty_template_id", label: "Warranty Template", type: "warranty-select" },
+  ],
+};
+SECTIONS.push(WARRANTY_SECTION);
+
 export function paybackRows(data) {
   const n = (v) => Number(v) || 0;
   const epcMonth = n(data.payback_epc_units_month);
