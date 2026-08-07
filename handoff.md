@@ -134,6 +134,15 @@ Closes out the 35-slide MRTV reference deck redesign except slide 35 (Thank You,
 
 ---
 
+## 2026-08-07 (2) — Fix cramped forgot-password form spacing
+
+**Frontend only** (`Login.jsx`, `App.css`):
+- The "Reset password" form was a bare `<form>` (no layout class), unlike the sign-in form which uses `.admin-login`'s flex+gap — so the email field and "Send reset link" button had no space between them.
+- Added `.forgot-form` (same flex/gap pattern) plus a short intro sentence above the email field for context. Verified in browser: clean spacing now between field and button.
+- Deployed: `firebase deploy --only hosting` only.
+
+---
+
 ## Workflow note
 
 Per client instruction: every code change in this repo should be **committed + pushed to GitHub, and deployed** (Firebase Hosting for frontend, Cloud Run for backend) as part of finishing the task — not left as local-only changes. Log a dated entry here summarizing what changed each time.
