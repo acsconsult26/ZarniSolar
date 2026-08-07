@@ -4,6 +4,16 @@ Running log of notable changes for AI tooling/session continuity. Newest entries
 
 ---
 
+## 2026-08-07 (7) — Fix Google Maps satellite 403 (EEA account restriction)
+
+**Backend only** (`map_image.py`):
+- User hit `403: satellite and hybrid map types are not available for your account and region` in the Surveying Data step's "Get Map Image from Coordinates" button, and assumed it was their VPN's location. It isn't -- the Maps Static API call runs server-side from Cloud Run (always `us-central1`), so the requesting browser's IP/VPN has zero effect. This is a newer Google account-level restriction (EEA/Digital Markets Act) that some Cloud projects get flagged into, blocking satellite/hybrid tiles specifically regardless of who's asking or from where.
+- Fixed: `fetch_static_map()` now detects that specific 403 and automatically retries with `maptype=roadmap` (not affected by the restriction) instead of failing the whole feature. Verified with a mocked-httpx unit test confirming the fallback fires and returns a valid image.
+- Not fixed by this change: satellite imagery itself is still blocked for this Google Cloud project until Google's EEA compliance form (linked in the original error) is filed on the account, or a different maps account/project is used. The map feature now degrades to a labeled road map instead of erroring out.
+- Deployed: `gcloud run deploy` (backend only, no frontend change).
+
+---
+
 ## 2026-08-07 (6) — Fix Settings whitespace gaps + saved-warranty visibility
 
 **Frontend only** (`Admin.jsx`, `App.css`):
