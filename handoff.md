@@ -4,6 +4,14 @@ Running log of notable changes for AI tooling/session continuity. Newest entries
 
 ---
 
+## 2026-08-07 (5) — Fix browser tab favicon
+
+**Frontend only** (`index.html`):
+- Browser tab was showing the default Vite `/favicon.svg` instead of the Zarni logo — both were linked as `rel="icon"` and the generic one won in some browsers. Removed it, kept only `/zarni-logo.png`, added it as `apple-touch-icon` too.
+- Deployed: `firebase deploy --only hosting` only.
+
+---
+
 ## 2026-08-07 (4) — Admin-managed content + full admin panel redesign
 
 **Content, now admin-controlled instead of per-proposal** (`boilerplate.py`, `pptx_export_v2.py`, `projects.py`, `fields.js`):
