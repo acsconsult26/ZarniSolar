@@ -120,6 +120,20 @@ Closes out the 35-slide MRTV reference deck redesign except slide 35 (Thank You,
 
 ---
 
+## 2026-08-07 — Proposal form redesign: full-page scroll + icons + motion
+
+**Frontend only** (`App.jsx`, `App.css`, `icons.jsx` (new)):
+- Replaced the old one-step-at-a-time wizard with a single continuous full-page layout — every section (Cover through Warranty) renders at once, stacked vertically, instead of behind Next/Back buttons.
+- Added a sticky left icon rail (horizontal scroll strip on mobile) that jump-scrolls to any section and highlights the one currently in view via a scroll listener.
+- Each section fades/slides in the first time it scrolls into the viewport (IntersectionObserver + CSS transition, respects `prefers-reduced-motion`).
+- Added a small hand-rolled SVG icon set (`icons.jsx`, no emoji) — every section header gets a themed icon badge, every field label gets a matching icon (calendar for dates, currency symbol for cost fields, location pin for lat/lng, etc.).
+- Buttons now carry meaning-based color: "Save Draft" is neutral gray, "Export PPTX" is green, "+ New" / map-fetch stay brand blue — replacing the old all-blue-or-all-white step-nav buttons.
+- Added a floating "back to top" button that fades in after scrolling.
+- Verified in the Browser pane via the dev-stub (`localStorage.__DEV_FORCE_VIEW`) technique, reverted before shipping; production build (`npm run build`) succeeded with no errors.
+- Deployed: `firebase deploy --only hosting` only — no backend changes this round.
+
+---
+
 ## Workflow note
 
 Per client instruction: every code change in this repo should be **committed + pushed to GitHub, and deployed** (Firebase Hosting for frontend, Cloud Run for backend) as part of finishing the task — not left as local-only changes. Log a dated entry here summarizing what changed each time.
