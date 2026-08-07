@@ -55,8 +55,9 @@ export default function Login() {
               <button onClick={() => { setMode("signin"); setPassword(""); }}>Back to sign in</button>
             </>
           ) : (
-            <form onSubmit={submitForgot}>
+            <form className="forgot-form" onSubmit={submitForgot}>
               <h2>Reset password</h2>
+              <p className="forgot-intro">Enter the email on your account and we'll send you a link to reset your password.</p>
               <label>
                 <span>Email</span>
                 <input value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />

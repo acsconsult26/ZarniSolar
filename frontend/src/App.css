@@ -219,6 +219,12 @@ footer button:disabled { opacity: 0.45; cursor: default; }
 .admin-login .hint { text-align: center; }
 .admin-login button.login-forgot-link, .admin-login form button.hint { background: none; color: var(--brand-blue); padding: 0.2rem; font-weight: 600; font-size: 0.82rem; text-decoration: underline; }
 
+.forgot-form { display: flex; flex-direction: column; gap: 0.9rem; }
+.forgot-intro { margin: -0.3rem 0 0.2rem; font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; text-align: center; }
+.forgot-form label { margin-bottom: 0.4rem; }
+.forgot-form button[type="submit"] { margin-top: 0.5rem; }
+.forgot-form button.hint { margin-top: 0.2rem; }
+
 /* ---------- admin dashboard shell (sidebar + main) ---------- */
 .admin-shell { display: flex; min-height: 100vh; background: var(--bg); }
 .admin-sidebar { width: 230px; flex-shrink: 0; background: var(--navy); color: #fff; display: flex; flex-direction: column; padding: 1.25rem 0.9rem; position: sticky; top: 0; height: 100vh; transition: width 0.18s ease; overflow: hidden; }
