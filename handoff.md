@@ -4,6 +4,25 @@ Running log of notable changes for AI tooling/session continuity. Newest entries
 
 ---
 
+## 2026-08-07 (4) — Admin-managed content + full admin panel redesign
+
+**Content, now admin-controlled instead of per-proposal** (`boilerplate.py`, `pptx_export_v2.py`, `projects.py`, `fields.js`):
+- Introduction (slide 2): admin sets it once (`introduction_message` boilerplate key) and it's reused on every client's deck. Removed the old per-project richtext "Introduction" step from the proposal form.
+- Warranty templates (slide 34, renamed "Zarni's Warranty" in the admin UI): restructured from free-text bullet `lines[]` to `{name, years, info}`. `_slide_warranty()` in `pptx_export_v2.py` renders the name as title, "N Years Warranty" as subtitle, info as body paragraphs.
+- "Zarni Electronics Service Info (slide 25)" is now "Thank You Message" (`thank_you_message` boilerplate key, was `closing_statement`), moved from a fixed mid-deck slide to the **final** slide of every generated deck.
+- Added `_plaintext_blocks()` helper in `pptx_export_v2.py` — these three fields are plain `<textarea>`s (not the rich-text editor), so each non-empty line becomes its own paragraph on the slide instead of being run through `parse_html`.
+- `export_project_v2()` signature changed: `closing_statement`/`warranty_lines` params replaced with `introduction_message`/`thank_you_message`/`warranty_template`.
+
+**Admin panel redesign** (`Admin.jsx`, new `Toast.jsx` + `Loading.jsx`, `icons.jsx`, `App.css`):
+- New toast system (slide in/out, bottom-right) replacing `alert()` for save/delete feedback across every tab.
+- New `Spinner`/`SkeletonRows`/`LoadingBlock`/`FadeIn` components (framer-motion, newly added dependency) used while each tab's data is fetching.
+- New button system — `.btn-primary/.btn-ghost/.btn-danger` + icon-only row-action buttons — color now signals meaning (blue=primary, red=delete, gray=neutral).
+- Settings tab rebuilt as categorized cards: Company Info & Branches (branches are now a dynamic add/remove list, not fixed at 2), Introduction Message, Zarni's Warranty, Thank You Message, Advanced (AI prompt now hidden behind an "Edit AI Prompt" button + modal, no more "Slide 19" wording anywhere). Removed the read-only "Backend Settings" card entirely. Removed all "(Slide N)" text from admin titles/copy.
+- **Found and fixed a real bug during verification**: `AnimatePresence mode="wait"` wrapping the tab content froze the UI on the previous tab forever (header title updated but content didn't) — some incompatibility in this environment. Fixed by dropping `AnimatePresence` and keeping a plain `motion.div` keyed by tab for the enter-fade only.
+- Verified via a standalone python-pptx smoke test (paragraph breaks, warranty subtitle, final Thank You slide all correct) and in-browser via the dev-stub technique (Settings cards, AI prompt modal, toast firing, tab switching all confirmed working with mocked API responses).
+
+---
+
 ## 2026-07-29 — Slides 29-34 (Technical Advantages, Mounting Structure, Warranty) + invite-based user auth
 
 **Slides 29-34** (`fields.js`, `pptx_export_v2.py`, `boilerplate.py`, `Admin.jsx`):
