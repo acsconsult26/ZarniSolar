@@ -15,12 +15,7 @@ class MapImageError(Exception):
     pass
 
 
-def fetch_static_map(lat: float, lng: float, *, maptype: str = "satellite", zoom: int = 18) -> bytes:
-    if not GOOGLE_MAPS_API_KEY:
-        raise MapImageError(
-            "Google Maps isn't configured on the server yet -- set the GOOGLE_MAPS_API_KEY "
-            "env var (Maps Static API enabled) on the backend."
-        )
+def _request_static_map(lat: float, lng: float, maptype: str, zoom: int) -> httpx.Response:
     params = {
         "center": f"{lat},{lng}",
         "zoom": str(zoom),
@@ -30,7 +25,25 @@ def fetch_static_map(lat: float, lng: float, *, maptype: str = "satellite", zoom
         "markers": f"color:red|{lat},{lng}",
         "key": GOOGLE_MAPS_API_KEY,
     }
-    resp = httpx.get("https://maps.googleapis.com/maps/api/staticmap", params=params, timeout=15)
+    return httpx.get("https://maps.googleapis.com/maps/api/staticmap", params=params, timeout=15)
+
+
+def fetch_static_map(lat: float, lng: float, *, maptype: str = "satellite", zoom: int = 18) -> bytes:
+    if not GOOGLE_MAPS_API_KEY:
+        raise MapImageError(
+            "Google Maps isn't configured on the server yet -- set the GOOGLE_MAPS_API_KEY "
+            "env var (Maps Static API enabled) on the backend."
+        )
+    resp = _request_static_map(lat, lng, maptype, zoom)
+
+    # Some Google Cloud projects are subject to an EEA/Digital Markets Act
+    # restriction that blocks satellite/hybrid tiles specifically (regardless
+    # of where the request is served from -- this runs server-side on Cloud
+    # Run, not from the requesting browser). Roadmap tiles aren't restricted,
+    # so fall back to those rather than failing the whole feature.
+    if resp.status_code == 403 and maptype in ("satellite", "hybrid") and "not available for your account" in resp.text:
+        resp = _request_static_map(lat, lng, "roadmap", zoom)
+
     if resp.status_code != 200 or resp.headers.get("content-type", "").startswith("text"):
         raise MapImageError(f"Google Maps request failed: {resp.status_code} {resp.text[:200]}")
     return resp.content
