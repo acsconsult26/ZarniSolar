@@ -278,15 +278,6 @@ footer button:disabled { opacity: 0.45; cursor: default; }
 .col-bar.gold { background: var(--brand-gold); }
 .col-label { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.35rem; }
 
-.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: start; }
-@media (max-width: 820px) { .settings-grid { grid-template-columns: 1fr; } }
-.settings-grid .admin-card label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.7rem; }
-.settings-grid .admin-card input, .settings-grid .admin-card textarea { padding: 0.55rem 0.65rem; border: 1px solid var(--border); border-radius: 10px; font: inherit; font-size: 0.88rem; }
-.settings-grid textarea { font-family: var(--mm), "Inter", monospace; resize: vertical; width: 100%; }
-.settings-grid .row button { padding: 0.6rem 1.2rem; border-radius: 10px; border: none; background: var(--brand-blue); color: #fff; cursor: pointer; font: inherit; font-weight: 600; margin-top: 0.4rem; }
-.branch-block { border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem; margin-bottom: 0.7rem; background: #fafbfe; }
-.branch-block h4 { margin: 0 0 0.5rem; color: var(--brand-blue); font-size: 0.82rem; }
-.settings-status { grid-column: 1 / -1; background: #e7f6ec; border: 1px solid #bfe3ca; color: #1c7a3d; padding: 0.7rem 1rem; border-radius: 10px; font-size: 0.85rem; }
 
 .settings-block { padding: 0.9rem 0; border-bottom: 1px solid var(--bg); }
 .settings-block h4 { margin: 0 0 0.4rem; color: var(--brand-blue); font-size: 0.9rem; }
@@ -566,8 +557,13 @@ footer button:disabled { opacity: 0.45; cursor: default; }
 .skeleton-row { height: 38px; border-radius: 8px; background: linear-gradient(90deg, var(--bg), #eef1f6, var(--bg)); }
 
 /* ---- settings tab: categorized cards ---- */
-.settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 1.25rem; align-items: start; }
-.settings-card { display: flex; flex-direction: column; gap: 0.9rem; }
+/* Masonry-style: CSS columns let each card flow to the top of the next
+   column instead of being locked to a grid row band -- a plain CSS grid
+   here left large dead gaps whenever neighboring cards had very different
+   heights (e.g. a short Introduction card next to a tall Warranty one). */
+.settings-grid { column-count: 2; column-gap: 1.25rem; }
+@media (max-width: 900px) { .settings-grid { column-count: 1; } }
+.settings-card { display: flex; flex-direction: column; gap: 0.9rem; break-inside: avoid; margin-bottom: 1.25rem; }
 .settings-card-head { display: flex; align-items: flex-start; gap: 0.8rem; }
 .settings-card-head h3 { margin: 0 0 0.2rem; color: var(--navy); }
 .settings-card-head .hint { margin: 0; }
@@ -588,6 +584,15 @@ footer button:disabled { opacity: 0.45; cursor: default; }
 .branches-head { margin-top: 0.4rem; }
 .branches-label { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; font-weight: 700; color: var(--brand-blue); text-transform: uppercase; letter-spacing: 0.03em; }
 .inline-icon { width: 15px; height: 15px; }
+
+.warranty-summary { display: flex; flex-direction: column; gap: 0.5rem; }
+.warranty-summary-label { font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.warranty-summary-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.warranty-chip {
+  display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.75rem; border-radius: 999px;
+  background: #e7f6ec; color: #1c7a3d; font-size: 0.8rem; font-weight: 700;
+}
+.warranty-chip-icon { width: 14px; height: 14px; flex-shrink: 0; }
 
 .warranty-block, .branch-block { border: 1px solid var(--border); border-radius: 12px; padding: 0.9rem 1rem; margin-top: 0.6rem; background: #fafbfe; overflow: hidden; }
 .warranty-block-row { display: flex; gap: 0.6rem; align-items: flex-end; margin-bottom: 0.7rem; }

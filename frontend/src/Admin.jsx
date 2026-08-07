@@ -986,6 +986,19 @@ function WarrantyTemplatesCard({ token }) {
         <SkeletonRows rows={2} />
       ) : (
         <>
+          {templates.length > 0 && (
+            <div className="warranty-summary">
+              <span className="warranty-summary-label">Currently saved</span>
+              <div className="warranty-summary-chips">
+                {templates.map((tpl) => (
+                  <span key={tpl.id} className="warranty-chip">
+                    <IconWarranty className="warranty-chip-icon" />
+                    {tpl.name || "Untitled"}{tpl.years ? ` · ${tpl.years} yrs` : ""}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
           <AnimatePresence initial={false}>
             {templates.map((tpl, i) => (
               <motion.div
