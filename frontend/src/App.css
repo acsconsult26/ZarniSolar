@@ -429,3 +429,80 @@ footer button:disabled { opacity: 0.45; cursor: default; }
 .clients-table .row { display: flex; gap: 0.35rem; flex-wrap: wrap; }
 .clients-table button { font-size: 0.74rem; padding: 0.35rem 0.65rem; border: 1px solid var(--border); background: #fff; border-radius: 8px; cursor: pointer; font-family: inherit; }
 .clients-table button:hover { border-color: var(--brand-blue); color: var(--brand-blue); }
+
+/* ========================================================================
+   Full-page proposal form: scrollable sections + rail nav + reveal motion
+   ======================================================================== */
+.fp-app { max-width: 1280px; margin: 0 auto; padding: 0 1.1rem 4rem; }
+
+.fp-meta-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.85rem 0 0; flex-wrap: wrap; }
+
+.fp-layout { display: grid; grid-template-columns: 260px 1fr; gap: 2rem; align-items: start; margin-top: 1rem; }
+@media (max-width: 900px) { .fp-layout { grid-template-columns: 1fr; } }
+
+.fp-rail {
+  position: sticky; top: 1rem; display: flex; flex-direction: column; gap: 0.2rem;
+  max-height: calc(100vh - 2rem); overflow-y: auto; padding-right: 0.4rem;
+}
+@media (max-width: 900px) {
+  .fp-rail { position: sticky; top: 0; z-index: 15; flex-direction: row; overflow-x: auto; max-height: none;
+    background: rgba(255,255,255,0.96); backdrop-filter: blur(6px); padding: 0.6rem 0.2rem; border-bottom: 1px solid var(--border); }
+  .fp-rail-btn span { display: none; }
+}
+.fp-rail-btn {
+  display: flex; align-items: center; gap: 0.6rem; padding: 0.6rem 0.75rem; border: none; border-radius: 10px;
+  background: none; color: var(--text-muted); cursor: pointer; font: inherit; font-weight: 600; font-size: 0.83rem;
+  text-align: left; white-space: nowrap; transition: background 0.15s, color 0.15s;
+}
+.fp-rail-btn:hover { background: var(--bg); color: var(--navy); }
+.fp-rail-btn.active { background: #eaf1fc; color: var(--brand-blue); }
+.fp-rail-btn.fp-rail-review.active { background: #e7f6ec; color: #1c7a3d; }
+.fp-rail-icon { width: 17px; height: 17px; flex-shrink: 0; }
+
+.fp-body { min-width: 0; display: flex; flex-direction: column; gap: 2.5rem; }
+
+.fp-section {
+  scroll-margin-top: 5.5rem;
+  opacity: 0; transform: translateY(28px);
+  transition: opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1), transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  padding-bottom: 2rem; border-bottom: 1px solid var(--border);
+}
+.fp-section:last-child { border-bottom: none; }
+.fp-section.fp-visible { opacity: 1; transform: translateY(0); }
+
+.fp-section-head { display: flex; align-items: flex-start; gap: 0.85rem; margin-bottom: 1.25rem; }
+.fp-section-icon {
+  flex-shrink: 0; width: 42px; height: 42px; border-radius: 12px; background: linear-gradient(135deg, #eaf1fc, #f7faff);
+  color: var(--brand-blue); display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow);
+}
+.fp-section-icon svg { width: 22px; height: 22px; }
+.fp-section-head h2 { margin: 0 0 0.15rem; color: var(--navy); font-size: 1.15rem; }
+.fp-section-head .section-note { margin: 0; }
+
+.field-icon { width: 15px; height: 15px; flex-shrink: 0; color: var(--brand-blue); opacity: 0.8; }
+.field-label { display: inline-flex; align-items: center; gap: 0.4rem; }
+.btn-icon { width: 16px; height: 16px; flex-shrink: 0; }
+
+.fp-review-section { scroll-margin-top: 5.5rem; }
+.save-btn { display: inline-flex; align-items: center; gap: 0.5rem; border-color: var(--text-muted); color: var(--text-muted); }
+.save-btn:hover:not(:disabled) { border-color: var(--navy); color: var(--navy); }
+.export-btn { display: inline-flex; align-items: center; gap: 0.5rem; }
+.export-actions .primary.export-btn { background: #1c7a3d; border-color: #1c7a3d; }
+.export-actions .primary.export-btn:hover:not(:disabled) { background: #15602f; }
+
+.new-project-btn { display: inline-flex; align-items: center; gap: 0.35rem; }
+.map-fetch-btn { display: inline-flex; align-items: center; gap: 0.5rem; }
+
+.fp-top-btn {
+  position: fixed; right: 1.5rem; bottom: 1.5rem; z-index: 25; width: 46px; height: 46px; border-radius: 50%;
+  border: 1px solid var(--border); background: var(--surface); color: var(--brand-blue); box-shadow: var(--shadow);
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  opacity: 0; transform: translateY(12px) scale(0.9); pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s;
+}
+.fp-top-btn.show { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+.fp-top-btn:hover { background: var(--brand-blue); color: #fff; border-color: var(--brand-blue); }
+
+@media (prefers-reduced-motion: reduce) {
+  .fp-section, .fp-top-btn { transition: none; }
+}

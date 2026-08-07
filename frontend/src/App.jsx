@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "./firebaseClient";
 import API_BASE, { api, ensureFreshToken } from "./api";
@@ -7,6 +7,7 @@ import RichText from "./RichText";
 import Admin from "./Admin";
 import Login from "./Login";
 import ResetPassword from "./ResetPassword";
+import { fieldIcon, sectionIcon, IconSave, IconExport, IconTop, IconPlus, IconLogout, IconMap } from "./icons";
 import "./App.css";
 
 function ProductSelect({ field, value, onChange }) {
@@ -16,7 +17,7 @@ function ProductSelect({ field, value, onChange }) {
   }, [field.category]);
   return (
     <label className="field">
-      <span className="field-label">{field.label}</span>
+      <FieldLabel field={field} />
       {field.help && <small className="field-help">{field.help}</small>}
       <select value={value ?? ""} onChange={(e) => onChange(field.name, e.target.value ? Number(e.target.value) : "")}>
         <option value="">— none —</option>
@@ -35,7 +36,7 @@ function WarrantySelect({ field, value, onChange }) {
   }, []);
   return (
     <label className="field">
-      <span className="field-label">{field.label}</span>
+      <FieldLabel field={field} />
       {field.help && <small className="field-help">{field.help}</small>}
       <select value={value ?? ""} onChange={(e) => onChange(field.name, e.target.value)}>
         <option value="">— none —</option>
@@ -44,6 +45,13 @@ function WarrantySelect({ field, value, onChange }) {
         ))}
       </select>
     </label>
+  );
+}
+
+function FieldLabel({ field }) {
+  const Icon = fieldIcon(field);
+  return (
+    <span className="field-label"><Icon className="field-icon" />{field.label}{field.required ? " *" : ""}</span>
   );
 }
 
@@ -57,24 +65,25 @@ function Field({ field, value, onChange }) {
   if (field.type === "richtext") {
     return (
       <div className="field field-wide">
-        <span className="field-label">{field.label}{field.required ? " *" : ""}</span>
+        <FieldLabel field={field} />
         {field.help && <small className="field-help">{field.help}</small>}
         <RichText value={value} onChange={(html) => onChange(field.name, html)} placeholder={field.help} />
       </div>
     );
   }
   if (field.type === "checkbox") {
+    const Icon = fieldIcon(field);
     return (
       <label className="field toggle-row">
         <input type="checkbox" checked={!!value} onChange={(e) => onChange(field.name, e.target.checked)} />
-        <span className="field-label">{field.label}</span>
+        <span className="field-label"><Icon className="field-icon" />{field.label}</span>
       </label>
     );
   }
   if (field.type === "textarea") {
     return (
       <label className="field field-wide">
-        <span className="field-label">{field.label}{field.required ? " *" : ""}</span>
+        <FieldLabel field={field} />
         {field.help && <small className="field-help">{field.help}</small>}
         <textarea rows={6} value={value ?? ""} onChange={(e) => onChange(field.name, e.target.value)} />
       </label>
@@ -82,7 +91,7 @@ function Field({ field, value, onChange }) {
   }
   return (
     <label className="field">
-      <span className="field-label">{field.label}{field.required ? " *" : ""}</span>
+      <FieldLabel field={field} />
       {field.help && <small className="field-help">{field.help}</small>}
       <input type={field.type} value={value ?? ""} onChange={(e) => onChange(field.name, e.target.value)} />
     </label>
@@ -143,7 +152,7 @@ function MapFetchButton({ config, projectId, data, setUploads }) {
   return (
     <div className="map-fetch">
       <button type="button" className="map-fetch-btn" onClick={fetchMap} disabled={!ready || status === "busy"}>
-        {status === "busy" ? "Fetching map…" : "📍 Get Map Image from Coordinates"}
+        <IconMap className="btn-icon" />{status === "busy" ? "Fetching map…" : "Get Map Image from Coordinates"}
       </button>
       {!ready && <small className="field-help">Enter latitude &amp; longitude above first.</small>}
       {status === "error" && <p className="error">{error}</p>}
@@ -469,17 +478,80 @@ function ClientPicker({ onPicked }) {
   );
 }
 
+function FormSection({ section, isReview, children, registerRef }) {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+  const Icon = isReview ? IconExport : sectionIcon(section.key);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setVisible(true); io.disconnect(); } },
+      { threshold: 0.12, rootMargin: "0px 0px -8% 0px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <section
+      id={`fp-${section.key}`}
+      ref={(el) => { ref.current = el; registerRef(section.key, el); }}
+      className={`fp-section${visible ? " fp-visible" : ""}`}
+    >
+      <div className="fp-section-head">
+        <span className="fp-section-icon"><Icon /></span>
+        <div>
+          <h2>{section.title}</h2>
+          {section.note && <p className="section-note">{section.note}</p>}
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+
 function ProposalForm({ initialProject, onExitToPicker }) {
   const [projectId, setProjectId] = useState(initialProject?.id ?? null);
   const [clientName, setClientName] = useState(initialProject?.client_name ?? null);
   const [name, setName] = useState(initialProject?.name ?? "Untitled Project");
   const [data, setData] = useState(initialProject?.data ?? {});
   const [uploads, setUploads] = useState(initialProject?.uploads ?? {});
-  const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportError, setExportError] = useState(null);
+  const [activeKey, setActiveKey] = useState(SECTIONS[0]?.key);
+  const [showTop, setShowTop] = useState(false);
+  const sectionRefs = useRef({});
   const view = "form";
+
+  function registerRef(key, el) {
+    if (el) sectionRefs.current[key] = el;
+  }
+
+  function jumpTo(key) {
+    sectionRefs.current[key]?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  // Highlights the nearest section in the rail as the user scrolls, and
+  // toggles the "scroll to top" button once they're a screen past the top.
+  useEffect(() => {
+    function onScroll() {
+      setShowTop(window.scrollY > 480);
+      const keys = [...SECTIONS.map((s) => s.key), "review"];
+      let current = keys[0];
+      for (const key of keys) {
+        const el = sectionRefs.current[key];
+        if (!el) continue;
+        if (el.getBoundingClientRect().top <= 140) current = key;
+      }
+      setActiveKey(current);
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   // Debounced auto-save
   useEffect(() => {
@@ -545,176 +617,175 @@ function ProposalForm({ initialProject, onExitToPicker }) {
     }
   }
 
-  const section = SECTIONS[step];
-  const sectionEnabled = !section?.optionalToggle || !!data[section.optionalToggle];
-  const totalSteps = SECTIONS.length + 1;
-  const isReview = step === SECTIONS.length;
-  const currentTitle = isReview ? "Review & Export" : section.title;
-  const pct = Math.round(((step + 1) / totalSteps) * 100);
-  const remainingTitles = isReview
-    ? []
-    : SECTIONS.slice(step + 1).map((s) => s.title).concat(["Review & Export"]);
-
   return (
-    <div className="app">
-      <div className="wizard-meta-row">
+    <div className="fp-app">
+      <div className="fp-meta-row">
         {clientName && <span className="client-badge">{clientName}</span>}
         <input className="project-name" value={name} onChange={(e) => setName(e.target.value)} />
         {projectId && <span className="project-id">#{projectId}</span>}
-        <button className="new-project-btn" onClick={onExitToPicker}>+ New</button>
+        <button className="new-project-btn" onClick={onExitToPicker}><IconPlus className="btn-icon" />New</button>
       </div>
 
-      <div className="wizard-progress">
-        <div className="wizard-progress-top">
-          <span className="wizard-step-label">Step {step + 1} of {totalSteps}</span>
-          <span className="wizard-step-title">{currentTitle}</span>
-        </div>
-        <div className="wizard-progress-bar">
-          <div className="wizard-progress-fill" style={{ width: `${pct}%` }} />
-        </div>
-        {remainingTitles.length > 0 && (
-          <div className="wizard-remaining">
-            <span className="wizard-remaining-count">
-              {remainingTitles.length} step{remainingTitles.length === 1 ? "" : "s"} left:
-            </span>
-            <span className="wizard-remaining-list">{remainingTitles.join(" · ")}</span>
-          </div>
-        )}
-        <select className="wizard-jump" value={step} onChange={(e) => setStep(Number(e.target.value))}>
-          {SECTIONS.map((s, i) => (
-            <option key={s.key} value={i}>{i + 1}. {s.title}</option>
-          ))}
-          <option value={SECTIONS.length}>{totalSteps}. Review &amp; Export</option>
-        </select>
-      </div>
+      <div className="fp-layout">
+        <nav className="fp-rail">
+          {SECTIONS.map((s) => {
+            const Icon = sectionIcon(s.key);
+            return (
+              <button
+                key={s.key}
+                className={`fp-rail-btn${activeKey === s.key ? " active" : ""}`}
+                onClick={() => jumpTo(s.key)}
+                title={s.title}
+              >
+                <Icon className="fp-rail-icon" />
+                <span>{s.title}</span>
+              </button>
+            );
+          })}
+          <button
+            className={`fp-rail-btn fp-rail-review${activeKey === "review" ? " active" : ""}`}
+            onClick={() => jumpTo("review")}
+            title="Review & Export"
+          >
+            <IconExport className="fp-rail-icon" />
+            <span>Review &amp; Export</span>
+          </button>
+        </nav>
 
-      <main className="wizard-body">
-        {step < SECTIONS.length && (
-          <section className="form-section">
-            <h2>{section.title}</h2>
-            {section.note && <p className="section-note">{section.note}</p>}
-
-            {section.optionalToggle && (
-              <label className="toggle-row">
-                <input
-                  type="checkbox"
-                  checked={!!data[section.optionalToggle]}
-                  onChange={(e) => setField(section.optionalToggle, e.target.checked)}
-                />
-                <span>Include these slides (only if the client has other metered buildings)</span>
-              </label>
-            )}
-
-            {section.systemOptions && <SystemOptions data={data} setField={setField} />}
-
-            {sectionEnabled && !section.systemOptions && (
-              <>
-                <div className="field-grid">
-                  {section.fields.map((f) => (
-                    <Field key={f.name} field={f} value={data[f.name]} onChange={setField} />
-                  ))}
-                </div>
-
-                {section.perUnit && (
-                  <div className="totals">
-                    <h3>Per-Unit Cost (AUTO)</h3>
-                    <p className="per-unit">{perUnitCost(data).toLocaleString()} MMK / unit</p>
-                    <p className="hint">= Total EPC Cost ÷ Total EPC Units. Shown on slide 6.</p>
-                  </div>
+        <main className="fp-body">
+          {SECTIONS.map((section) => {
+            const sectionEnabled = !section.optionalToggle || !!data[section.optionalToggle];
+            return (
+              <FormSection key={section.key} section={section} registerRef={registerRef}>
+                {section.optionalToggle && (
+                  <label className="toggle-row">
+                    <input
+                      type="checkbox"
+                      checked={!!data[section.optionalToggle]}
+                      onChange={(e) => setField(section.optionalToggle, e.target.checked)}
+                    />
+                    <span>Include these slides (only if the client has other metered buildings)</span>
+                  </label>
                 )}
 
-                {section.roiCalc && (() => {
-                  const r = roiCompute(data);
-                  const mmk = (n) => Math.round(n).toLocaleString();
-                  return (
-                    <div className="totals">
-                      <h3>ROI Calculation (live)</h3>
-                      <p className="hint">EPC : Solar = <strong>{r.ratio}</strong> ({r.epcPct}% : {r.solarPct}%)</p>
-                      <ul>
-                        <li>EPC-only — annual: {mmk(r.annualEpc)} MMK · {r.years} yr: <strong>{mmk(r.totalEpc)} MMK</strong></li>
-                        <li>Solar — annual: {mmk(r.annualSolar)} MMK · {r.years} yr: <strong>{mmk(r.totalSolar)} MMK</strong></li>
-                        <li>Savings over {r.years} yr: <strong>{mmk(r.savings)} MMK</strong></li>
-                      </ul>
-                    </div>
-                  );
-                })()}
+                {section.systemOptions && <SystemOptions data={data} setField={setField} />}
 
-                {section.paybackTable && (() => {
-                  const pb = paybackRows(data);
-                  const mmk = (v) => Math.round(v).toLocaleString();
-                  if (pb.columns.length === 0) return <p className="hint">Add options in the System Options step first.</p>;
-                  return (
-                    <div className="payback-preview">
-                      <h3>Live Preview — Slide 17</h3>
-                      <div className="pb-scroll">
-                        <table className="pb-table">
-                          <tbody>
-                            <tr><th>Options</th>{pb.columns.map((c, k) => <th key={k}>{c.title}</th>)}</tr>
-                            <tr><td>System</td>{pb.columns.map((c, k) => <td key={k}>{c.system}</td>)}</tr>
-                            <tr><td>CAPEX (MMK)</td>{pb.columns.map((c, k) => <td key={k}>{mmk(c.capex)}</td>)}</tr>
-                            <tr><td>EPC / Month</td>{pb.columns.map((_, k) => <td key={k}>{mmk(pb.epcMonth)} Units</td>)}</tr>
-                            <tr><td>EPC / Year (MMK)</td>{pb.columns.map((_, k) => <td key={k}>{mmk(pb.epcYear)}</td>)}</tr>
-                            <tr><td>Solar / Month</td>{pb.columns.map((c, k) => <td key={k}>{mmk(c.solarMonth)} Units</td>)}</tr>
-                            <tr><td>Solar / Year</td>{pb.columns.map((c, k) => <td key={k}>{mmk(c.solarYear)} Units</td>)}</tr>
-                            <tr><td>Payback Period</td>{pb.columns.map((c, k) => <td key={k}>{c.payback} Years</td>)}</tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {section.mapFetch && (
-                  <MapFetchButton config={section.mapFetch} projectId={projectId} data={data} setUploads={setUploads} />
-                )}
-
-                {section.powerAnalyzer && (
-                  <PowerAnalyzer config={section.powerAnalyzer} projectId={projectId} data={data} uploads={uploads}
-                                setField={setField} setUploads={setUploads} />
-                )}
-
-                {section.images && (
+                {sectionEnabled && !section.systemOptions && (
                   <>
-                    <h3>Photos</h3>
-                    <div className="image-grid">
-                      {section.images.map((img) => (
-                        <ImageUpload
-                          key={img.name}
-                          image={img}
-                          projectId={projectId}
-                          currentUrl={api.fileUrl(uploads[img.name])}
-                          onUploaded={(fieldName, url) => setUploads((u) => ({ ...u, [fieldName]: url }))}
-                        />
+                    <div className="field-grid">
+                      {section.fields.map((f) => (
+                        <Field key={f.name} field={f} value={data[f.name]} onChange={setField} />
                       ))}
                     </div>
+
+                    {section.perUnit && (
+                      <div className="totals">
+                        <h3>Per-Unit Cost (AUTO)</h3>
+                        <p className="per-unit">{perUnitCost(data).toLocaleString()} MMK / unit</p>
+                        <p className="hint">= Total EPC Cost ÷ Total EPC Units. Shown on slide 6.</p>
+                      </div>
+                    )}
+
+                    {section.roiCalc && (() => {
+                      const r = roiCompute(data);
+                      const mmk = (n) => Math.round(n).toLocaleString();
+                      return (
+                        <div className="totals">
+                          <h3>ROI Calculation (live)</h3>
+                          <p className="hint">EPC : Solar = <strong>{r.ratio}</strong> ({r.epcPct}% : {r.solarPct}%)</p>
+                          <ul>
+                            <li>EPC-only — annual: {mmk(r.annualEpc)} MMK · {r.years} yr: <strong>{mmk(r.totalEpc)} MMK</strong></li>
+                            <li>Solar — annual: {mmk(r.annualSolar)} MMK · {r.years} yr: <strong>{mmk(r.totalSolar)} MMK</strong></li>
+                            <li>Savings over {r.years} yr: <strong>{mmk(r.savings)} MMK</strong></li>
+                          </ul>
+                        </div>
+                      );
+                    })()}
+
+                    {section.paybackTable && (() => {
+                      const pb = paybackRows(data);
+                      const mmk = (v) => Math.round(v).toLocaleString();
+                      if (pb.columns.length === 0) return <p className="hint">Add options in the System Options step first.</p>;
+                      return (
+                        <div className="payback-preview">
+                          <h3>Live Preview — Slide 17</h3>
+                          <div className="pb-scroll">
+                            <table className="pb-table">
+                              <tbody>
+                                <tr><th>Options</th>{pb.columns.map((c, k) => <th key={k}>{c.title}</th>)}</tr>
+                                <tr><td>System</td>{pb.columns.map((c, k) => <td key={k}>{c.system}</td>)}</tr>
+                                <tr><td>CAPEX (MMK)</td>{pb.columns.map((c, k) => <td key={k}>{mmk(c.capex)}</td>)}</tr>
+                                <tr><td>EPC / Month</td>{pb.columns.map((_, k) => <td key={k}>{mmk(pb.epcMonth)} Units</td>)}</tr>
+                                <tr><td>EPC / Year (MMK)</td>{pb.columns.map((_, k) => <td key={k}>{mmk(pb.epcYear)}</td>)}</tr>
+                                <tr><td>Solar / Month</td>{pb.columns.map((c, k) => <td key={k}>{mmk(c.solarMonth)} Units</td>)}</tr>
+                                <tr><td>Solar / Year</td>{pb.columns.map((c, k) => <td key={k}>{mmk(c.solarYear)} Units</td>)}</tr>
+                                <tr><td>Payback Period</td>{pb.columns.map((c, k) => <td key={k}>{c.payback} Years</td>)}</tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {section.mapFetch && (
+                      <MapFetchButton config={section.mapFetch} projectId={projectId} data={data} setUploads={setUploads} />
+                    )}
+
+                    {section.powerAnalyzer && (
+                      <PowerAnalyzer config={section.powerAnalyzer} projectId={projectId} data={data} uploads={uploads}
+                                    setField={setField} setUploads={setUploads} />
+                    )}
+
+                    {section.images && (
+                      <>
+                        <h3>Photos</h3>
+                        <div className="image-grid">
+                          {section.images.map((img) => (
+                            <ImageUpload
+                              key={img.name}
+                              image={img}
+                              projectId={projectId}
+                              currentUrl={api.fileUrl(uploads[img.name])}
+                              onUploaded={(fieldName, url) => setUploads((u) => ({ ...u, [fieldName]: url }))}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </>
                 )}
-              </>
-            )}
-          </section>
-        )}
+              </FormSection>
+            );
+          })}
 
-        {step === SECTIONS.length && (
-          <section className="form-section">
-            <h2>Review &amp; Export</h2>
-            <p className="hint">The proposal deck is generated as a dark-themed PowerPoint (slides 1–12). More sections coming soon.</p>
+          <section
+            id="fp-review"
+            ref={(el) => registerRef("review", el)}
+            className="fp-section fp-visible fp-review-section"
+          >
+            <div className="fp-section-head">
+              <span className="fp-section-icon"><IconExport /></span>
+              <div>
+                <h2>Review &amp; Export</h2>
+                <p className="section-note">The proposal deck is generated as a dark-themed PowerPoint.</p>
+              </div>
+            </div>
             <div className="export-actions">
-              <button onClick={saveDraft} disabled={saving}>{saving ? "Saving..." : "Save Draft"}</button>
-              <button className="primary" onClick={handleExport} disabled={exportBusy}>
-                {exportBusy ? "Exporting..." : "Export PPTX"}
+              <button className="save-btn" onClick={saveDraft} disabled={saving}>
+                <IconSave className="btn-icon" />{saving ? "Saving..." : "Save Draft"}
+              </button>
+              <button className="primary export-btn" onClick={handleExport} disabled={exportBusy}>
+                <IconExport className="btn-icon" />{exportBusy ? "Exporting..." : "Export PPTX"}
               </button>
             </div>
             {exportError && <p className="error">{exportError}</p>}
           </section>
-        )}
-      </main>
-
-      <div className="wizard-footer">
-        <button disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))}>← Back</button>
-        {!isReview && (
-          <button className="primary" onClick={() => setStep((s) => Math.min(SECTIONS.length, s + 1))}>Next →</button>
-        )}
+        </main>
       </div>
+
+      <button className={`fp-top-btn${showTop ? " show" : ""}`} onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} title="Back to top">
+        <IconTop />
+      </button>
     </div>
   );
 }
@@ -804,7 +875,7 @@ export default function App() {
           {isAdmin && (
             <button className="topbar-link" onClick={() => setView("admin")}>Admin</button>
           )}
-          <button className="icon-btn" title={`Log out (${user?.name || user?.email})`} onClick={logout}>⏻</button>
+          <button className="icon-btn" title={`Log out (${user?.name || user?.email})`} onClick={logout}><IconLogout /></button>
         </div>
       </div>
 
