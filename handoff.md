@@ -143,6 +143,17 @@ Closes out the 35-slide MRTV reference deck redesign except slide 35 (Thank You,
 
 ---
 
+## 2026-08-07 (3) — Fix reload data loss on the proposal form
+
+**Frontend only** (`App.jsx`):
+- User reported: filled-in form data disappears on page reload.
+- Root causes were two separate gaps: (1) which project was currently open only lived in React state — a reload always dropped back to the client picker even though the server had the last autosave; (2) the autosave to the server is debounced 700ms, so a reload inside that window lost whatever was typed most recently.
+- Fixes: `App` now remembers the active project id in `localStorage` (`zarni_active_project_id`) and re-fetches it on load instead of showing the picker. `ProposalForm` mirrors every field edit to a per-project `localStorage` draft immediately (no debounce), restores it on mount, and clears it once the debounced server autosave (or an explicit "Save Draft") confirms the data landed.
+- Verified via the dev-stub technique: typed into a field, confirmed the localStorage draft updated instantly, reloaded, confirmed the value was restored.
+- Deployed: `firebase deploy --only hosting` only.
+
+---
+
 ## Workflow note
 
 Per client instruction: every code change in this repo should be **committed + pushed to GitHub, and deployed** (Firebase Hosting for frontend, Cloud Run for backend) as part of finishing the task — not left as local-only changes. Log a dated entry here summarizing what changed each time.
