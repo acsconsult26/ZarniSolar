@@ -4,6 +4,17 @@ Running log of notable changes for AI tooling/session continuity. Newest entries
 
 ---
 
+## 2026-08-07 (6) — Fix Settings whitespace gaps + saved-warranty visibility
+
+**Frontend only** (`Admin.jsx`, `App.css`):
+- `.settings-grid` was a CSS Grid with row bands, so a short card (e.g. Introduction) next to a tall one (e.g. Warranty with several templates) left a large dead gap underneath — classic uneven-grid-row problem. Switched to a CSS-columns masonry layout (`column-count`, `break-inside: avoid` on each card) so cards pack top-to-bottom per column regardless of neighboring heights.
+- User reported not being able to see already-saved warranty templates after saving. They were actually being fetched and rendered as full edit forms, just not visible at a glance without scrolling through each one's info textarea. Added a "Currently saved" chip row at the top of Zarni's Warranty showing each template's name + years compactly.
+- Also removed a stale, fully-overridden duplicate `.settings-grid`/`.branch-block`/`.settings-status` CSS block left over from before the Settings redesign.
+- Verified in-browser via the dev-stub technique with mocked API responses.
+- Deployed: `firebase deploy --only hosting` only.
+
+---
+
 ## 2026-08-07 (5) — Fix browser tab favicon
 
 **Frontend only** (`index.html`):
