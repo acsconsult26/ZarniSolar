@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
 import { sendPasswordResetEmail } from "firebase/auth";
+import { AnimatePresence, motion } from "framer-motion";
 import { api } from "./api";
 import { auth } from "./firebaseClient";
+import { ToastProvider, useToast } from "./Toast";
+import { LoadingBlock, SkeletonRows, FadeIn } from "./Loading";
+import {
+  IconEdit, IconTrash, IconSearch, IconBuilding, IconBranch, IconMessage, IconSparkle,
+  IconMail, IconRefresh, IconWarranty, IconPlus, IconSave, IconLogout,
+} from "./icons";
 
 function sendInviteEmail(email) {
   return sendPasswordResetEmail(auth, email, {
@@ -233,7 +240,8 @@ function CategoryModal({ token, categories, products, onClose, onChanged }) {
 }
 
 function ProductsTab({ token }) {
-  const [products, setProducts] = useState([]);
+  const toast = useToast();
+  const [products, setProducts] = useState(null);
   const [categories, setCategories] = useState(FALLBACK_CATEGORIES);
   const [filterCat, setFilterCat] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -271,42 +279,54 @@ function ProductsTab({ token }) {
 
   async function remove(id) {
     if (!confirm("Delete this product?")) return;
-    await api.deleteProduct(token, id);
-    refresh();
+    try {
+      await api.deleteProduct(token, id);
+      toast.success("Product deleted.");
+      refresh();
+    } catch (err) {
+      toast.error(String(err));
+    }
   }
 
   const q = searchQuery.toLowerCase();
-  const rows = products.filter((p) => {
+  const rows = (products || []).filter((p) => {
     if (filterCat && p.category !== filterCat) return false;
     if (!q) return true;
     return [p.brand, p.model_name, p.spec_title].some((v) => (v || "").toLowerCase().includes(q));
   });
 
   return (
+    <FadeIn>
     <div className="admin-card catalog-card">
       <div className="catalog-head">
         <div className="catalog-filters">
           <select value={filterCat} onChange={(e) => setFilterCat(e.target.value)}>
             <option value="">All Categories</option>
             {categories.map((c) => (
-              <option key={c.key} value={c.key}>{c.label} ({products.filter((p) => p.category === c.key).length})</option>
+              <option key={c.key} value={c.key}>{c.label} ({(products || []).filter((p) => p.category === c.key).length})</option>
             ))}
           </select>
-          <input
-            className="catalog-search"
-            placeholder="Search brand, model, spec title…"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && runSearch()}
-          />
-          <button className="ghost-btn" onClick={runSearch}>Search</button>
+          <div className="search-input-wrap">
+            <IconSearch className="search-input-icon" />
+            <input
+              className="catalog-search"
+              placeholder="Search brand, model, spec title…"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && runSearch()}
+            />
+          </div>
+          <button className="btn btn-ghost" onClick={runSearch}>Search</button>
         </div>
         <div className="catalog-actions">
-          <button className="ghost-btn" onClick={() => setManageCats(true)}>Manage Categories</button>
-          <button className="add-product-btn" onClick={openAdd}>+ Add Product</button>
+          <button className="btn btn-ghost" onClick={() => setManageCats(true)}>Manage Categories</button>
+          <button className="btn btn-primary" onClick={openAdd}><IconPlus className="btn-icon" />Add Product</button>
         </div>
       </div>
 
+      {products === null ? (
+        <SkeletonRows rows={5} />
+      ) : (
       <div className="table-scroll">
       <table className="catalog-table">
         <thead>
@@ -327,14 +347,15 @@ function ProductsTab({ token }) {
               <td>{(p.specs || []).length} rows</td>
               <td>{p.warranty_line || "—"}</td>
               <td className="row-actions">
-                <button onClick={() => openEdit(p)}>Edit</button>
-                <button className="danger" onClick={() => remove(p.id)}>Delete</button>
+                <button className="btn-icon-ghost" title="Edit" onClick={() => openEdit(p)}><IconEdit /></button>
+                <button className="btn-icon-danger" title="Delete" onClick={() => remove(p.id)}><IconTrash /></button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
       </div>
+      )}
 
       {modal && (
         <ProductModal
@@ -350,7 +371,7 @@ function ProductsTab({ token }) {
         <CategoryModal
           token={token}
           categories={categories}
-          products={products}
+          products={products || []}
           onClose={() => setManageCats(false)}
           onChanged={(next) => {
             setCategories(next);
@@ -359,52 +380,71 @@ function ProductsTab({ token }) {
         />
       )}
     </div>
+    </FadeIn>
   );
 }
 
 function ProposalsTab({ onEditClient }) {
-  const [projects, setProjects] = useState([]);
+  const toast = useToast();
+  const [projects, setProjects] = useState(null);
 
   async function refresh() { setProjects(await api.listProjects()); }
   useEffect(() => { refresh(); }, []);
 
   async function regenerate(id) {
-    await api.exportProject(id);
+    try {
+      await api.exportProject(id);
+      toast.success("PPTX regenerated and downloaded.");
+    } catch (err) {
+      toast.error(String(err));
+    }
   }
   async function remove(id) {
     if (!confirm("Delete this proposal?")) return;
-    await api.deleteProject(id);
-    refresh();
+    try {
+      await api.deleteProject(id);
+      toast.success("Proposal deleted.");
+      refresh();
+    } catch (err) {
+      toast.error(String(err));
+    }
   }
 
   return (
+    <FadeIn>
     <div className="admin-card">
-      <h3>Proposals & History ({projects.length})</h3>
+      <h3>Proposals & History {projects && `(${projects.length})`}</h3>
+      {projects === null ? (
+        <SkeletonRows rows={5} />
+      ) : (
       <div className="table-scroll">
       <table className="clients-table">
         <thead>
           <tr><th>#</th><th>Client</th><th>Proposal Name</th><th>Site</th><th>Status</th><th>Updated</th><th>Actions</th></tr>
         </thead>
         <tbody>
+          {projects.length === 0 && <tr><td colSpan={7} className="empty-row">No proposals yet.</td></tr>}
           {projects.map((p) => (
             <tr key={p.id}>
               <td>{p.id}</td>
               <td>{p.client_name || "—"}</td>
               <td>{p.name}</td>
               <td>{p.data?.site_name || "—"}</td>
-              <td>{p.status}</td>
+              <td><span className={`status-pill status-${p.status}`}>{p.status}</span></td>
               <td>{p.updated_at ? new Date(p.updated_at).toLocaleString() : "—"}</td>
-              <td className="row">
-                <button onClick={() => onEditClient(p.id)}>Edit</button>
-                <button onClick={() => regenerate(p.id)}>Regenerate PPTX</button>
-                <button onClick={() => remove(p.id)}>Delete</button>
+              <td className="row-actions">
+                <button className="btn-icon-ghost" title="Edit" onClick={() => onEditClient(p.id)}><IconEdit /></button>
+                <button className="btn-icon-ghost" title="Regenerate PPTX" onClick={() => regenerate(p.id)}><IconRefresh /></button>
+                <button className="btn-icon-danger" title="Delete" onClick={() => remove(p.id)}><IconTrash /></button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
       </div>
+      )}
     </div>
+    </FadeIn>
   );
 }
 
@@ -462,7 +502,8 @@ function ClientModal({ initial, onClose, onSaved }) {
 }
 
 function ClientsTab() {
-  const [clients, setClients] = useState([]);
+  const toast = useToast();
+  const [clients, setClients] = useState(null);
   const [modal, setModal] = useState(null);
 
   async function refresh() { setClients(await api.listClients()); }
@@ -472,18 +513,23 @@ function ClientsTab() {
     if (!confirm("Delete this client? (Only allowed if they have no proposals.)")) return;
     try {
       await api.deleteClient(id);
+      toast.success("Client deleted.");
       refresh();
     } catch (err) {
-      alert(String(err));
+      toast.error(String(err));
     }
   }
 
   return (
+    <FadeIn>
     <div className="admin-card">
       <div className="catalog-head">
-        <h3>Clients ({clients.length})</h3>
-        <button className="add-product-btn" onClick={() => setModal(EMPTY_CLIENT)}>+ Add Client</button>
+        <h3>Clients {clients && `(${clients.length})`}</h3>
+        <button className="btn btn-primary" onClick={() => setModal(EMPTY_CLIENT)}><IconPlus className="btn-icon" />Add Client</button>
       </div>
+      {clients === null ? (
+        <SkeletonRows rows={5} />
+      ) : (
       <div className="table-scroll">
       <table className="clients-table">
         <thead>
@@ -499,18 +545,20 @@ function ClientsTab() {
               <td>{c.organization || "—"}</td>
               <td>{c.project_count}</td>
               <td className="row-actions">
-                <button onClick={() => setModal(c)}>Edit</button>
-                <button className="danger" onClick={() => remove(c.id)}>Delete</button>
+                <button className="btn-icon-ghost" title="Edit" onClick={() => setModal(c)}><IconEdit /></button>
+                <button className="btn-icon-danger" title="Delete" onClick={() => remove(c.id)}><IconTrash /></button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
       </div>
+      )}
       {modal && (
-        <ClientModal initial={modal} onClose={() => setModal(null)} onSaved={() => { setModal(null); refresh(); }} />
+        <ClientModal initial={modal} onClose={() => setModal(null)} onSaved={() => { setModal(null); refresh(); toast.success(modal.id ? "Client updated." : "Client added."); }} />
       )}
     </div>
+    </FadeIn>
   );
 }
 
@@ -537,17 +585,21 @@ function LogsTab() {
   }, []);
 
   return (
+    <FadeIn>
     <div className="admin-card">
       <div className="catalog-head">
         <h3>System Logs {rows.length > 0 && `(${rows.length})`}</h3>
       </div>
+      {loading ? (
+        <SkeletonRows rows={6} />
+      ) : (
       <div className="table-scroll">
       <table className="clients-table">
         <thead>
           <tr><th>When</th><th>User</th><th>Action</th><th>Detail</th></tr>
         </thead>
         <tbody>
-          {!loading && rows.length === 0 && <tr><td colSpan={4} className="empty-row">No activity recorded yet.</td></tr>}
+          {rows.length === 0 && <tr><td colSpan={4} className="empty-row">No activity recorded yet.</td></tr>}
           {rows.map((r) => (
             <tr key={r.id}>
               <td>{r.created_at ? new Date(r.created_at).toLocaleString() : "—"}</td>
@@ -559,7 +611,9 @@ function LogsTab() {
         </tbody>
       </table>
       </div>
+      )}
     </div>
+    </FadeIn>
   );
 }
 
@@ -666,9 +720,9 @@ function UserModal({ initial, onClose, onSaved }) {
 }
 
 function UsersTab({ currentEmail }) {
-  const [users, setUsers] = useState([]);
+  const toast = useToast();
+  const [users, setUsers] = useState(null);
   const [modal, setModal] = useState(null);
-  const [resent, setResent] = useState(null);
 
   async function refresh() { setUsers(await api.listUsers()); }
   useEffect(() => { refresh(); }, []);
@@ -677,56 +731,62 @@ function UsersTab({ currentEmail }) {
     if (!confirm("Delete this user?")) return;
     try {
       await api.deleteUser(id);
+      toast.success("User deleted.");
       refresh();
     } catch (err) {
-      alert(String(err));
+      toast.error(String(err));
     }
   }
 
   async function resendInvite(email) {
     try {
       await sendInviteEmail(email);
-      setResent(email);
-      setTimeout(() => setResent(null), 4000);
+      toast.success(`Invite/reset link resent to ${email}.`);
     } catch (err) {
-      alert(String(err));
+      toast.error(String(err));
     }
   }
 
   return (
+    <FadeIn>
     <div className="admin-card">
       <div className="catalog-head">
-        <h3>Staff & Admin Accounts ({users.length})</h3>
-        <button className="add-product-btn" onClick={() => setModal(EMPTY_USER)}>+ Invite User</button>
+        <h3>Staff & Admin Accounts {users && `(${users.length})`}</h3>
+        <button className="btn btn-primary" onClick={() => setModal(EMPTY_USER)}><IconPlus className="btn-icon" />Invite User</button>
       </div>
-      {resent && <p className="settings-status">Invite/reset link resent to {resent}.</p>}
+      {users === null ? (
+        <SkeletonRows rows={4} />
+      ) : (
       <div className="table-scroll">
       <table className="clients-table">
         <thead>
           <tr><th>Email</th><th>Name</th><th>Role</th><th>Status</th><th>Last login</th><th></th></tr>
         </thead>
         <tbody>
+          {users.length === 0 && <tr><td colSpan={6} className="empty-row">No users yet.</td></tr>}
           {users.map((u) => (
             <tr key={u.id}>
               <td>{u.email}</td>
               <td>{u.name || "—"}</td>
-              <td>{u.role}</td>
-              <td>{u.is_active ? "Active" : "Disabled"}</td>
+              <td><span className={`role-pill role-${u.role}`}>{u.role}</span></td>
+              <td><span className={`status-pill ${u.is_active ? "status-active" : "status-disabled"}`}>{u.is_active ? "Active" : "Disabled"}</span></td>
               <td>{u.last_login_at ? new Date(u.last_login_at).toLocaleString() : "Never"}</td>
               <td className="row-actions">
-                <button onClick={() => setModal({ ...u, password: "" })}>Edit</button>
-                <button onClick={() => resendInvite(u.email)}>{u.last_login_at ? "Reset password" : "Resend invite"}</button>
-                <button className="danger" disabled={u.email === currentEmail} onClick={() => remove(u.id)}>Delete</button>
+                <button className="btn-icon-ghost" title="Edit" onClick={() => setModal({ ...u, password: "" })}><IconEdit /></button>
+                <button className="btn-icon-ghost" title={u.last_login_at ? "Reset password" : "Resend invite"} onClick={() => resendInvite(u.email)}><IconMail /></button>
+                <button className="btn-icon-danger" title="Delete" disabled={u.email === currentEmail} onClick={() => remove(u.id)}><IconTrash /></button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
       </div>
+      )}
       {modal && (
         <UserModal initial={modal} onClose={() => setModal(null)} onSaved={() => { setModal(null); refresh(); }} />
       )}
     </div>
+    </FadeIn>
   );
 }
 
@@ -735,13 +795,20 @@ function DashboardTab({ onGoTo }) {
   const [projects, setProjects] = useState([]);
   const [clients, setClients] = useState([]);
   const [exportStats, setExportStats] = useState({ total: 0, by_month: {} });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.listProductsAll().then(setProducts).catch(() => {});
-    api.listProjects().then(setProjects).catch(() => {});
-    api.listClients().then(setClients).catch(() => {});
-    api.getBoilerplate("export_stats").then((s) => setExportStats(s || { total: 0, by_month: {} })).catch(() => {});
+    Promise.allSettled([
+      api.listProductsAll().then(setProducts),
+      api.listProjects().then(setProjects),
+      api.listClients().then(setClients),
+      api.getBoilerplate("export_stats").then((s) => setExportStats(s || { total: 0, by_month: {} })),
+    ]).finally(() => setLoading(false));
   }, []);
+
+  if (loading) {
+    return <div className="admin-card"><LoadingBlock label="Loading dashboard…" /></div>;
+  }
 
   const count = (cat) => products.filter((p) => p.category === cat).length;
   const recent = [...projects]
@@ -781,13 +848,21 @@ function DashboardTab({ onGoTo }) {
   const maxClientMonth = Math.max(1, ...clientMonths.map((m) => clientsByMonth[m]));
 
   return (
+    <FadeIn>
     <div>
       <div className="stat-grid">
-        {stats.map((s) => (
-          <button key={s.label} className={`stat-card accent-${s.accent}`} onClick={() => onGoTo(s.to)}>
+        {stats.map((s, i) => (
+          <motion.button
+            key={s.label}
+            className={`stat-card accent-${s.accent}`}
+            onClick={() => onGoTo(s.to)}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: i * 0.05 }}
+          >
             <span className="stat-value">{s.value}</span>
             <span className="stat-label">{s.label}</span>
-          </button>
+          </motion.button>
         ))}
       </div>
 
@@ -859,12 +934,14 @@ function DashboardTab({ onGoTo }) {
         )}
       </div>
     </div>
+    </FadeIn>
   );
 }
 
 function WarrantyTemplatesCard({ token }) {
+  const toast = useToast();
   const [templates, setTemplates] = useState(null);
-  const [status, setStatus] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     api.getBoilerplate("warranty_templates").then((t) => setTemplates(t || [])).catch(() => setTemplates([]));
@@ -873,7 +950,7 @@ function WarrantyTemplatesCard({ token }) {
   function addTemplate() {
     setTemplates((t) => [
       ...(t || []),
-      { id: `template_${Date.now().toString(36)}`, name: `Template ${(t?.length || 0) + 1}`, lines: [] },
+      { id: `template_${Date.now().toString(36)}`, name: `New Warranty`, years: "", info: "" },
     ]);
   }
   function updateTemplate(i, patch) {
@@ -884,118 +961,298 @@ function WarrantyTemplatesCard({ token }) {
     setTemplates((t) => t.filter((_, idx) => idx !== i));
   }
   async function save() {
-    await api.putBoilerplate(token, "warranty_templates", templates);
-    setStatus("Warranty templates saved — pick one per proposal on the Warranty step.");
-    setTimeout(() => setStatus(""), 4000);
+    setSaving(true);
+    try {
+      await api.putBoilerplate(token, "warranty_templates", templates);
+      toast.success("Zarni's Warranty templates saved.");
+    } catch (err) {
+      toast.error(String(err));
+    } finally {
+      setSaving(false);
+    }
   }
 
-  if (templates === null) return <div className="admin-card"><p className="hint">Loading warranty templates…</p></div>;
+  return (
+    <div className="admin-card settings-card">
+      <div className="settings-card-head">
+        <span className="settings-card-icon warranty"><IconWarranty /></span>
+        <div>
+          <h3>Zarni's Warranty</h3>
+          <p className="hint">Named warranty templates — staff choose one per proposal in the Warranty step.</p>
+        </div>
+      </div>
+
+      {templates === null ? (
+        <SkeletonRows rows={2} />
+      ) : (
+        <>
+          <AnimatePresence initial={false}>
+            {templates.map((tpl, i) => (
+              <motion.div
+                key={tpl.id}
+                className="warranty-block"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.25 }}
+              >
+                <div className="warranty-block-row">
+                  <label className="grow"><span>Warranty name</span>
+                    <input value={tpl.name} onChange={(e) => updateTemplate(i, { name: e.target.value })} placeholder="e.g. Standard Warranty" />
+                  </label>
+                  <label className="years-field"><span>Years</span>
+                    <input type="number" min="0" value={tpl.years ?? ""} onChange={(e) => updateTemplate(i, { years: e.target.value })} placeholder="5" />
+                  </label>
+                  <button type="button" className="btn-icon-danger" title="Delete template" onClick={() => removeTemplate(i)}>
+                    <IconTrash />
+                  </button>
+                </div>
+                <label><span>Warranty info</span>
+                  <textarea rows={4} value={tpl.info || ""} placeholder="What's covered, replacement terms, exclusions…"
+                           onChange={(e) => updateTemplate(i, { info: e.target.value })} />
+                </label>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+
+          {templates.length === 0 && <p className="hint">No warranty templates yet — add one below.</p>}
+
+          <div className="settings-card-actions">
+            <button type="button" className="btn btn-ghost" onClick={addTemplate}><IconPlus className="btn-icon" />Add Warranty</button>
+            <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
+              <IconSave className="btn-icon" />{saving ? "Saving…" : "Save Warranty Templates"}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function AiPromptModal({ token, prompt, onClose, onSaved }) {
+  const toast = useToast();
+  const [value, setValue] = useState(prompt);
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    setSaving(true);
+    try {
+      await api.putBoilerplate(token, "slide19_prompt_template", value);
+      toast.success("AI prompt saved.");
+      onSaved(value);
+    } catch (err) {
+      toast.error(String(err));
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
-    <div className="admin-card">
-      <h3>Warranty Templates (Slide 34)</h3>
-      <p className="hint">Save named warranty templates — staff pick one per proposal on the Warranty step.</p>
-      {templates.map((tpl, i) => (
-        <div key={tpl.id} className="branch-block">
-          <div className="row" style={{ alignItems: "center" }}>
-            <label style={{ flex: 1 }}><span>Name</span>
-              <input value={tpl.name} onChange={(e) => updateTemplate(i, { name: e.target.value })} />
-            </label>
-            <button type="button" onClick={() => removeTemplate(i)}>Delete</button>
-          </div>
-          <label><span>Warranty lines (one per line)</span>
-            <textarea rows={4} value={(tpl.lines || []).join("\n")}
-                     onChange={(e) => updateTemplate(i, { lines: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean) })} />
-          </label>
+    <div className="modal-overlay" onMouseDown={onClose}>
+      <div className="modal ai-prompt-modal" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3><IconSparkle className="modal-title-icon" />Edit AI Prompt</h3>
+          <button type="button" className="modal-close" onClick={onClose}>×</button>
         </div>
-      ))}
-      <div className="row">
-        <button type="button" onClick={addTemplate}>+ Add Template</button>
-        <button onClick={save}>Save Templates</button>
+        <div className="modal-body">
+          <p className="hint">Placeholders like {"{site_name}"}, {"{total_solar_kwp}"}, {"{panel_qty}"} are filled in automatically from each project.</p>
+          <textarea rows={12} value={value} onChange={(e) => setValue(e.target.value)} />
+        </div>
+        <div className="modal-foot">
+          <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
+            <IconSave className="btn-icon" />{saving ? "Saving…" : "Save Prompt"}
+          </button>
+        </div>
       </div>
-      {status && <p className="hint">{status}</p>}
     </div>
   );
 }
 
 function SettingsTab({ token }) {
+  const toast = useToast();
   const [company, setCompany] = useState(null);
   const [prompt, setPrompt] = useState("");
-  const [closing, setClosing] = useState("");
-  const [status, setStatus] = useState("");
+  const [intro, setIntro] = useState("");
+  const [thankYou, setThankYou] = useState("");
+  const [savingCompany, setSavingCompany] = useState(false);
+  const [savingIntro, setSavingIntro] = useState(false);
+  const [savingThankYou, setSavingThankYou] = useState(false);
+  const [showAiModal, setShowAiModal] = useState(false);
 
   useEffect(() => {
     api.getBoilerplate("company_info").then(setCompany).catch(() => {});
     api.getBoilerplate("slide19_prompt_template").then((p) => setPrompt(typeof p === "string" ? p : "")).catch(() => {});
-    api.getBoilerplate("closing_statement").then((c) => setClosing(typeof c === "string" ? c : "")).catch(() => {});
+    api.getBoilerplate("introduction_message").then((m) => setIntro(typeof m === "string" ? m : "")).catch(() => {});
+    api.getBoilerplate("thank_you_message").then((m) => setThankYou(typeof m === "string" ? m : "")).catch(() => {});
   }, []);
 
   function setBranch(i, k, v) {
     setCompany((c) => {
-      const branches = [...(c.branches || [{}, {}])];
+      const branches = [...(c.branches || [])];
       branches[i] = { ...branches[i], [k]: v };
       return { ...c, branches };
     });
   }
+  function addBranch() {
+    setCompany((c) => ({ ...c, branches: [...(c.branches || []), { address: "", phone: "" }] }));
+  }
+  function removeBranch(i) {
+    setCompany((c) => ({ ...c, branches: (c.branches || []).filter((_, idx) => idx !== i) }));
+  }
 
   async function saveCompany() {
-    await api.putBoilerplate(token, "company_info", company);
-    flash("Company info saved — appears on slide 2 (Company/Branches).");
+    setSavingCompany(true);
+    try {
+      await api.putBoilerplate(token, "company_info", company);
+      toast.success("Company info & branches saved.");
+    } catch (err) {
+      toast.error(String(err));
+    } finally {
+      setSavingCompany(false);
+    }
   }
-  async function savePrompt() {
-    await api.putBoilerplate(token, "slide19_prompt_template", prompt);
-    flash("Slide-19 AI prompt saved.");
+  async function saveIntro() {
+    setSavingIntro(true);
+    try {
+      await api.putBoilerplate(token, "introduction_message", intro);
+      toast.success("Introduction message saved — used on every client's Introduction slide.");
+    } catch (err) {
+      toast.error(String(err));
+    } finally {
+      setSavingIntro(false);
+    }
   }
-  async function saveClosing() {
-    await api.putBoilerplate(token, "closing_statement", closing);
-    flash("Zarni Electronics Service info saved — appears on slide 25.");
+  async function saveThankYou() {
+    setSavingThankYou(true);
+    try {
+      await api.putBoilerplate(token, "thank_you_message", thankYou);
+      toast.success("Thank You message saved — shown on the final slide of every deck.");
+    } catch (err) {
+      toast.error(String(err));
+    } finally {
+      setSavingThankYou(false);
+    }
   }
-  function flash(msg) { setStatus(msg); setTimeout(() => setStatus(""), 4000); }
 
-  if (!company) return <div className="admin-card"><p className="hint">Loading settings…</p></div>;
-  const branches = company.branches || [{}, {}];
+  if (!company) {
+    return (
+      <div className="admin-card">
+        <LoadingBlock label="Loading settings…" />
+      </div>
+    );
+  }
+  const branches = company.branches || [];
 
   return (
-    <div className="settings-grid">
-      {status && <div className="settings-status">{status}</div>}
-
-      <div className="admin-card">
-        <h3>Company Info (Slide 2)</h3>
-        <label><span>Company name</span><input value={company.company_name || ""} onChange={(e) => setCompany({ ...company, company_name: e.target.value })} /></label>
-        <label><span>Contact number (Slide 1)</span><input value={company.contact || ""} onChange={(e) => setCompany({ ...company, contact: e.target.value })} /></label>
-        <label><span>Website</span><input value={company.website || ""} onChange={(e) => setCompany({ ...company, website: e.target.value })} /></label>
-        {[0, 1].map((i) => (
-          <div key={i} className="branch-block">
-            <h4>Branch {i + 1}</h4>
-            <label><span>Address</span><input value={branches[i]?.address || ""} onChange={(e) => setBranch(i, "address", e.target.value)} /></label>
-            <label><span>Phone</span><input value={branches[i]?.phone || ""} onChange={(e) => setBranch(i, "phone", e.target.value)} /></label>
+    <FadeIn>
+      <div className="settings-grid">
+        <div className="admin-card settings-card">
+          <div className="settings-card-head">
+            <span className="settings-card-icon company"><IconBuilding /></span>
+            <div>
+              <h3>Company Info & Branches</h3>
+              <p className="hint">Shown on the cover and company slides for every proposal.</p>
+            </div>
           </div>
-        ))}
-        <div className="row"><button onClick={saveCompany}>Save Company Info</button></div>
+          <div className="field-grid">
+            <label><span>Company name</span><input value={company.company_name || ""} onChange={(e) => setCompany({ ...company, company_name: e.target.value })} /></label>
+            <label><span>Contact number</span><input value={company.contact || ""} onChange={(e) => setCompany({ ...company, contact: e.target.value })} /></label>
+            <label className="field-wide"><span>Website</span><input value={company.website || ""} onChange={(e) => setCompany({ ...company, website: e.target.value })} /></label>
+          </div>
+
+          <div className="branches-head">
+            <span className="branches-label"><IconBranch className="inline-icon" />Branches</span>
+          </div>
+          <AnimatePresence initial={false}>
+            {branches.map((b, i) => (
+              <motion.div
+                key={i}
+                className="branch-block"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.25 }}
+              >
+                <div className="warranty-block-row">
+                  <label className="grow"><span>Address</span><input value={b.address || ""} onChange={(e) => setBranch(i, "address", e.target.value)} /></label>
+                  <label className="years-field"><span>Phone</span><input value={b.phone || ""} onChange={(e) => setBranch(i, "phone", e.target.value)} /></label>
+                  <button type="button" className="btn-icon-danger" title="Remove branch" onClick={() => removeBranch(i)}>
+                    <IconTrash />
+                  </button>
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+          {branches.length === 0 && <p className="hint">No branches yet.</p>}
+
+          <div className="settings-card-actions">
+            <button type="button" className="btn btn-ghost" onClick={addBranch}><IconPlus className="btn-icon" />Add Branch</button>
+            <button type="button" className="btn btn-primary" onClick={saveCompany} disabled={savingCompany}>
+              <IconSave className="btn-icon" />{savingCompany ? "Saving…" : "Save Company Info"}
+            </button>
+          </div>
+        </div>
+
+        <div className="admin-card settings-card">
+          <div className="settings-card-head">
+            <span className="settings-card-icon intro"><IconMessage /></span>
+            <div>
+              <h3>Introduction Message</h3>
+              <p className="hint">Set once — used on the Introduction slide for every client's deck.</p>
+            </div>
+          </div>
+          <textarea rows={6} value={intro} onChange={(e) => setIntro(e.target.value)} placeholder="Why choose us, key benefits…" />
+          <div className="settings-card-actions">
+            <button type="button" className="btn btn-primary" onClick={saveIntro} disabled={savingIntro}>
+              <IconSave className="btn-icon" />{savingIntro ? "Saving…" : "Save Introduction"}
+            </button>
+          </div>
+        </div>
+
+        <WarrantyTemplatesCard token={token} />
+
+        <div className="admin-card settings-card">
+          <div className="settings-card-head">
+            <span className="settings-card-icon thankyou"><IconMail /></span>
+            <div>
+              <h3>Thank You Message</h3>
+              <p className="hint">Shown on the final slide of every generated deck.</p>
+            </div>
+          </div>
+          <textarea rows={6} value={thankYou} onChange={(e) => setThankYou(e.target.value)} placeholder="Closing note shown to every client…" />
+          <div className="settings-card-actions">
+            <button type="button" className="btn btn-primary" onClick={saveThankYou} disabled={savingThankYou}>
+              <IconSave className="btn-icon" />{savingThankYou ? "Saving…" : "Save Thank You Message"}
+            </button>
+          </div>
+        </div>
+
+        <div className="admin-card settings-card">
+          <div className="settings-card-head">
+            <span className="settings-card-icon advanced"><IconSparkle /></span>
+            <div>
+              <h3>Advanced</h3>
+              <p className="hint">The AI image prompt used to auto-generate a slide illustration.</p>
+            </div>
+          </div>
+          <div className="settings-card-actions">
+            <button type="button" className="btn btn-ghost" onClick={() => setShowAiModal(true)}>
+              <IconSparkle className="btn-icon" />Edit AI Prompt
+            </button>
+          </div>
+        </div>
       </div>
 
-      <WarrantyTemplatesCard token={token} />
-
-      <div className="admin-card">
-        <h3>Slide-19 AI Prompt Template</h3>
-        <p className="hint">Placeholders like {"{site_name}"}, {"{total_solar_kwp}"}, {"{panel_qty}"} are filled from the project.</p>
-        <textarea rows={10} value={prompt} onChange={(e) => setPrompt(e.target.value)} />
-        <div className="row"><button onClick={savePrompt}>Save Prompt</button></div>
-      </div>
-
-      <div className="admin-card">
-        <h3>Zarni Electronics Service Info (Slide 25)</h3>
-        <p className="hint">Fixed FYI text shown to every client. One line per point.</p>
-        <textarea rows={6} value={closing} onChange={(e) => setClosing(e.target.value)} />
-        <div className="row"><button onClick={saveClosing}>Save Service Info</button></div>
-      </div>
-
-      <div className="admin-card">
-        <h3>Backend Settings (read-only)</h3>
-        <div className="settings-block"><h4>Admin/Staff accounts</h4><p className="hint">Manage via the Users tab.</p></div>
-        <div className="settings-block"><h4>AI Provider</h4><p className="hint">Set <code>IMAGE_GEN_PROVIDER</code> / <code>IMAGE_GEN_API_KEY</code> env vars to enable slide-19 generation.</p></div>
-      </div>
-    </div>
+      {showAiModal && (
+        <AiPromptModal
+          token={token}
+          prompt={prompt}
+          onClose={() => setShowAiModal(false)}
+          onSaved={(v) => { setPrompt(v); setShowAiModal(false); }}
+        />
+      )}
+    </FadeIn>
   );
 }
 
@@ -1086,7 +1343,7 @@ const PAGE_TITLES = {
   settings: "Settings",
 };
 
-export default function Admin({ onEditClient, onExit, onLogout, currentEmail, userName }) {
+function AdminShell({ onEditClient, onExit, onLogout, currentEmail, userName }) {
   const [tab, setTab] = useState("dashboard");
   const [collapsed, setCollapsed] = useState(false);
 
@@ -1124,19 +1381,34 @@ export default function Admin({ onEditClient, onExit, onLogout, currentEmail, us
           <h2>{PAGE_TITLES[tab]}</h2>
           <div className="admin-topbar-actions">
             <span className="admin-user-chip">{userName}</span>
-            <button className="icon-btn" title="Log out" onClick={onLogout}>⏻</button>
+            <button className="icon-btn" title="Log out" onClick={onLogout}><IconLogout /></button>
           </div>
         </header>
         <div className="admin-content">
-          {tab === "dashboard" && <DashboardTab onGoTo={setTab} />}
-          {tab === "products" && <ProductsTab />}
-          {tab === "clients" && <ClientsTab />}
-          {tab === "proposals" && <ProposalsTab onEditClient={onEditClient} />}
-          {tab === "users" && <UsersTab currentEmail={currentEmail} />}
-          {tab === "logs" && <LogsTab />}
-          {tab === "settings" && <SettingsTab />}
+          <motion.div
+            key={tab}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {tab === "dashboard" && <DashboardTab onGoTo={setTab} />}
+            {tab === "products" && <ProductsTab />}
+            {tab === "clients" && <ClientsTab />}
+            {tab === "proposals" && <ProposalsTab onEditClient={onEditClient} />}
+            {tab === "users" && <UsersTab currentEmail={currentEmail} />}
+            {tab === "logs" && <LogsTab />}
+            {tab === "settings" && <SettingsTab />}
+          </motion.div>
         </div>
       </main>
     </div>
+  );
+}
+
+export default function Admin(props) {
+  return (
+    <ToastProvider>
+      <AdminShell {...props} />
+    </ToastProvider>
   );
 }

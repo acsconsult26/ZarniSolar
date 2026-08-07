@@ -11,13 +11,6 @@ export const SECTIONS = [
     note: "Contact number is set in Admin → Settings.",
   },
   {
-    key: "intro",
-    title: "Introduction (Slide 2)",
-    fields: [
-      { name: "introduction", label: "Introduction message", help: "မိတ်ဆက်စာ — why choose us, benefits. Format with bold / italic / lists.", type: "richtext" },
-    ],
-  },
-  {
     key: "objectives",
     title: "Project Objectives (Slide 4)",
     fields: [

@@ -248,17 +248,17 @@ def export(project_id: str):
         raise HTTPException(404, "Project not found")
     company_info = bp.read("company_info")
     selected_products = _gather_selected_products(project.get("data") or {})
-    closing_statement = bp.read("closing_statement")
+    introduction_message = bp.read("introduction_message")
+    thank_you_message = bp.read("thank_you_message")
     warranty_template_id = (project.get("data") or {}).get("warranty_template_id")
-    warranty_lines = None
+    warranty_template = None
     if warranty_template_id:
         templates = bp.read("warranty_templates") or []
-        template = next((t for t in templates if t.get("id") == warranty_template_id), None)
-        warranty_lines = template.get("lines") if template else None
+        warranty_template = next((t for t in templates if t.get("id") == warranty_template_id), None)
     pptx_bytes = export_project_v2(
         _ProjectView(project), storage, company_info=company_info,
-        selected_products=selected_products, closing_statement=closing_statement,
-        warranty_lines=warranty_lines,
+        selected_products=selected_products, introduction_message=introduction_message,
+        thank_you_message=thank_you_message, warranty_template=warranty_template,
     )
     # track export stats (month bucket) for the dashboard
     stats = dict(bp.read("export_stats") or {})

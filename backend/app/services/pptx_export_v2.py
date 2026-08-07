@@ -53,7 +53,7 @@ class _Imgs:
 
 
 def export_project_v2(project, storage, company_info=None, selected_products=None,
-                      closing_statement=None, warranty_lines=None) -> bytes:
+                      introduction_message=None, thank_you_message=None, warranty_template=None) -> bytes:
     data = project.data or {}
     v = merged_field_values(data)
     ci = company_info or {}
@@ -66,7 +66,7 @@ def export_project_v2(project, storage, company_info=None, selected_products=Non
     W = prs.slide_width
 
     _slide1_cover(prs, client, v.get("proposal_date"), company_name, contact)
-    _slide2_intro(prs, v.get("introduction"), company_name)
+    _slide2_intro(prs, introduction_message, company_name)
     _slide3_contents(prs, company_name)
     _slide4_objectives(prs, v.get("project_objectives"), company_name)
     _slide5_surveying(prs, v, imgs, company_name)
@@ -166,11 +166,6 @@ def export_project_v2(project, storage, company_info=None, selected_products=Non
         title = "East View Shade Report" + (" (Perfect)" if data.get("east_shade_perfect") else "")
         _slide_photo_row(prs, title, east_imgs, company_name, page)
 
-    # Slide 25 : fixed FYI info about Zarni Electronics Service (admin-editable)
-    if closing_statement:
-        page = len(prs.slides._sldIdLst) + 1
-        _slide_closing_statement(prs, closing_statement, company_name, page)
-
     # Slides 26-28 : selected product specifications (Solar, Battery, Inverter)
     for category, title in (("panel", "Solar Panel Specification"),
                             ("battery", "Battery Specification"),
@@ -204,9 +199,14 @@ def export_project_v2(project, storage, company_info=None, selected_products=Non
             _slide_image_note(prs, label, img, note, company_name, page)
 
     # Slide 34 : Warranty (admin-managed template, chosen per-proposal)
-    if warranty_lines:
+    if warranty_template:
         page = len(prs.slides._sldIdLst) + 1
-        _slide_bullets(prs, "Warranty", warranty_lines, company_name, page)
+        _slide_warranty(prs, warranty_template, company_name, page)
+
+    # Final slide : Thank You (admin-editable, shown on every deck)
+    if thank_you_message:
+        page = len(prs.slides._sldIdLst) + 1
+        _slide_thank_you(prs, thank_you_message, company_name, page)
 
     import io
     out = io.BytesIO()
@@ -237,10 +237,19 @@ def _slide1_cover(prs, client, date, company_name, contact):
                size=13, color=T.MUTED, align=PP_ALIGN.RIGHT)
 
 
+def _plaintext_blocks(text):
+    """One paragraph block per non-empty line -- for admin-set plain
+    <textarea> content (not the frontend's HTML rich-text editor)."""
+    lines = [line for line in (text or "").split("\n") if line.strip()]
+    if not lines:
+        return [{"type": "p", "items": [[{"text": "", "bold": False, "italic": False}]]}]
+    return [{"type": "p", "items": [[{"text": line, "bold": False, "italic": False}]]} for line in lines]
+
+
 def _slide2_intro(prs, introduction, company_name):
     slide = T.add_slide(prs, page=2, company_name=company_name)
     top = T.add_title(slide, prs, "Introduction")
-    blocks = parse_html(introduction) or [{"type": "p", "items": [[{"text": "", "bold": False, "italic": False}]]}]
+    blocks = _plaintext_blocks(introduction)
     T.add_richtext(slide, blocks, Inches(0.9), top, prs.slide_width - Inches(1.8),
                    prs.slide_height - top - Inches(0.8), size=16)
 
@@ -436,10 +445,10 @@ def _slide_photo_row(prs, title, images, company_name, page, labels=None):
                        size=12, italic=True, color=T.MUTED, align=PP_ALIGN.CENTER)
 
 
-def _slide_closing_statement(prs, text, company_name, page):
+def _slide_thank_you(prs, text, company_name, page):
     slide = T.add_slide(prs, page=page, company_name=company_name)
-    top = T.add_title(slide, prs, "Zarni Electronics Service")
-    blocks = parse_html(text)
+    top = T.add_title(slide, prs, "Thank You")
+    blocks = _plaintext_blocks(text)
     T.add_richtext(slide, blocks, Inches(0.9), top, prs.slide_width - Inches(1.8),
                    prs.slide_height - top - Inches(0.8), size=16)
 
@@ -468,19 +477,19 @@ def _slide_image_note(prs, title, image, note, company_name, page):
                    size=18, bold=True, color=T.WHITE, anchor=MSO_ANCHOR.MIDDLE)
 
 
-def _slide_bullets(prs, title, lines, company_name, page):
-    """Simple bulleted-line slide (Warranty, slide 34)."""
+def _slide_warranty(prs, template, company_name, page):
+    """Warranty slide (34) built from an admin-managed template: name +
+    years badge in the subtitle, free-form info paragraph below."""
+    name = template.get("name") or "Warranty"
+    years = template.get("years")
+    subtitle = f"{years} Year{'s' if years and float(years) != 1 else ''} Warranty" if years else None
     slide = T.add_slide(prs, page=page, company_name=company_name)
-    top = T.add_title(slide, prs, title)
-    box = slide.shapes.add_textbox(Inches(0.9), top, prs.slide_width - Inches(1.8),
-                                   prs.slide_height - top - Inches(0.9))
-    tf = box.text_frame
-    T._no_autosize(tf)
-    for i, line in enumerate(lines):
-        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
-        p.space_after = Pt(14)
-        run = p.add_run()
-        T._apply_run(run, f"•  {line}", size=17, bold=False, italic=False, color=T.WHITE, font=T.FONT)
+    top = T.add_title(slide, prs, name, subtitle=subtitle)
+    info = template.get("info") or ""
+    if info.strip():
+        blocks = _plaintext_blocks(info)
+        T.add_richtext(slide, blocks, Inches(0.9), top, prs.slide_width - Inches(1.8),
+                       prs.slide_height - top - Inches(0.8), size=16)
 
 
 def _product_image(storage, product):

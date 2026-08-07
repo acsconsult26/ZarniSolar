@@ -16,26 +16,21 @@ BOILERPLATE_DEFAULTS = {
         "company_name": "ZARNI AUNG & SONS Co.,Ltd",
         "contact": "09-2031977",
     },
-    "warranty_lines": [
-        "Sigenergy PV 60M1-HYB - 5 Years Full Warranty (Replacement)",
-        "Sigenergy Battery 12kWh, 5+5 Years Warranty (Replacement)",
-        "Sigenergy GateWay Home SP - 2 Years Services Warranty",
-    ],
-    # Named warranty templates (slide 34) -- the proposal form lets the user
-    # pick one per project instead of hand-typing warranty lines each time.
+    # Shown on every client's Introduction slide (2) -- set once by admin
+    # instead of retyped per proposal.
+    "introduction_message": "",
+    # Named warranty templates (slide 34, "Zarni's Warranty") -- staff pick
+    # one per project instead of hand-typing warranty terms each time.
     "warranty_templates": [
         {
             "id": "standard",
             "name": "Standard Warranty",
-            "lines": [
-                "Sigenergy Inverter + Battery - 5 Years Full Warranty (Replacement)",
-                "Sigenergy GateWay - 2 Years Service Warranty",
-                "Solar Panel - 15 Years Warranty",
-                "Installation (ZARNI Electronics) - 1 Year Warranty",
-            ],
+            "years": 5,
+            "info": "Sigenergy Inverter + Battery - 5 Years Full Warranty (Replacement)\nSigenergy GateWay - 2 Years Service Warranty\nSolar Panel - 15 Years Warranty\nInstallation (ZARNI Electronics) - 1 Year Warranty",
         },
     ],
-    "closing_statement": "Zarni Electronic မှ တပ်ဆင်ပေးထားသော Sigenergy Brand သည် တပ်ဆင်ထားသည်မှ ယနေ့အချိန်...",
+    # Shown on the final "Thank You" slide of every deck.
+    "thank_you_message": "Zarni Electronic မှ တပ်ဆင်ပေးထားသော Sigenergy Brand သည် တပ်ဆင်ထားသည်မှ ယနေ့အချိန်...",
     "reference_projects": [],
     "reference_sites_table": [],
     "slide19_prompt_template": DEFAULT_PROMPT_TEMPLATE,

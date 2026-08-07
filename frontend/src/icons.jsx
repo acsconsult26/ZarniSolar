@@ -64,6 +64,21 @@ export const IconPlus = (p) => <svg {...base} {...p}><path d="M12 5v14M5 12h14" 
 export const IconLogout = (p) => <svg {...base} {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5M21 12H9" /></svg>;
 export const IconMap = (p) => <svg {...base} {...p}><path d="M9 4 3 6.5v14L9 18l6 2.5 6-2.5v-14L15 6.5 9 4Z" /><path d="M9 4v14M15 6.5v14" /></svg>;
 
+// ---- admin panel icons ----
+export const IconEdit = (p) => <svg {...base} {...p}><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>;
+export const IconTrash = (p) => <svg {...base} {...p}><path d="M4 7h16" /><path d="M9 7V4h6v3M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" /><path d="M10 11v6M14 11v6" /></svg>;
+export const IconSearch = (p) => <svg {...base} {...p}><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>;
+export const IconBuilding = (p) => <svg {...base} {...p}><rect x="4" y="3" width="16" height="18" rx="1" /><path d="M8 7h1M8 11h1M8 15h1M15 7h1M15 11h1M15 15h1M10 21v-4h4v4" /></svg>;
+export const IconBranch = (p) => <svg {...base} {...p}><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12Z" /><circle cx="12" cy="9" r="2.5" /></svg>;
+export const IconMessage = (p) => <svg {...base} {...p}><path d="M4 5h16v11H8l-4 4V5Z" /><path d="M8 9h8M8 12h5" /></svg>;
+export const IconSparkle = (p) => <svg {...base} {...p}><path d="M12 3v3M12 18v3M3 12h3M18 12h3" /><path d="m6.5 6.5 1.6 1.6M15.9 15.9l1.6 1.6M6.5 17.5l1.6-1.6M15.9 8.1l1.6-1.6" /><circle cx="12" cy="12" r="2.5" /></svg>;
+export const IconMail = (p) => <svg {...base} {...p}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m4 7 8 6 8-6" /></svg>;
+export const IconRefresh = (p) => <svg {...base} {...p}><path d="M4 12a8 8 0 0 1 14-5.3L21 9" /><path d="M21 4v5h-5" /><path d="M20 12a8 8 0 0 1-14 5.3L3 15" /><path d="M3 20v-5h5" /></svg>;
+export const IconCheckCircle = (p) => <svg {...base} {...p}><circle cx="12" cy="12" r="9" /><path d="m8.5 12 2.3 2.3L16 9.5" /></svg>;
+export const IconAlert = (p) => <svg {...base} {...p}><path d="M10.3 3.9 2.6 18a1.5 1.5 0 0 0 1.3 2.2h16.2a1.5 1.5 0 0 0 1.3-2.2L13.7 3.9a1.5 1.5 0 0 0-2.6 0Z" /><path d="M12 9v5M12 17h.01" /></svg>;
+export const IconGrid = (p) => <svg {...base} {...p}><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>;
+export const IconFilter = (p) => <svg {...base} {...p}><path d="M4 5h16l-6 8v6l-4 2v-8Z" /></svg>;
+
 export const SECTION_ICONS = {
   cover: IconCover,
   intro: IconIntro,
