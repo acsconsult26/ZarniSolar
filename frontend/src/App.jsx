@@ -553,12 +553,44 @@ function ProposalForm({ initialProject, onExitToPicker }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Debounced auto-save
+  const draftKey = projectId ? `zarni_draft_${projectId}` : null;
+
+  // Restore any unsaved local draft on first mount -- covers a reload that
+  // happens inside the 700ms autosave debounce window below, where the
+  // latest keystrokes never made it to the server.
+  useEffect(() => {
+    if (!draftKey) return;
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (!raw) return;
+      const draft = JSON.parse(raw);
+      if (draft?.data) setData((d) => ({ ...d, ...draft.data }));
+      if (draft?.uploads) setUploads((u) => ({ ...u, ...draft.uploads }));
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey]);
+
+  // Mirror every edit to localStorage immediately (synchronous, no debounce)
+  // so a reload never loses more than what's already on screen.
+  useEffect(() => {
+    if (!draftKey) return;
+    try {
+      localStorage.setItem(draftKey, JSON.stringify({ name, data, uploads }));
+    } catch {}
+  }, [draftKey, name, data, uploads]);
+
+  // Debounced auto-save to the server. Once it succeeds the local draft is
+  // redundant (server now has the same state), so it's cleared -- keeps
+  // localStorage from accumulating stale drafts across projects.
   useEffect(() => {
     if (!projectId || view !== "form") return;
-    const t = setTimeout(() => api.updateProject(projectId, { name, data }).catch(() => {}), 700);
+    const t = setTimeout(() => {
+      api.updateProject(projectId, { name, data })
+        .then(() => { if (draftKey) localStorage.removeItem(draftKey); })
+        .catch(() => {});
+    }, 700);
     return () => clearTimeout(t);
-  }, [name, data, projectId, view]);
+  }, [name, data, projectId, view, draftKey]);
 
   function setField(fieldName, value) {
     setData((d) => ({ ...d, [fieldName]: value }));
@@ -598,6 +630,7 @@ function ProposalForm({ initialProject, onExitToPicker }) {
     setSaving(true);
     try {
       await api.updateProject(projectId, { name, data });
+      if (draftKey) localStorage.removeItem(draftKey);
     } finally {
       setSaving(false);
     }
@@ -800,11 +833,25 @@ function BootLoader() {
   );
 }
 
+const LAST_PROJECT_KEY = "zarni_active_project_id";
+
 export default function App() {
   const [authState, setAuthState] = useState("checking"); // checking | out | in
   const [user, setUser] = useState(null);
   const [view, setView] = useState("form"); // form | admin
   const [activeProject, setActiveProject] = useState(null); // null = show client picker
+  const [resuming, setResuming] = useState(false);
+
+  // Remembers which project is open so a page reload reopens it instead of
+  // dropping back to the client picker (the project's own data is already
+  // safe via the server autosave + local draft in ProposalForm).
+  function pickProject(p) {
+    setActiveProject(p);
+    try {
+      if (p) localStorage.setItem(LAST_PROJECT_KEY, p.id);
+      else localStorage.removeItem(LAST_PROJECT_KEY);
+    } catch {}
+  }
 
   useEffect(() => {
     return onAuthStateChanged(auth, (fbUser) => {
@@ -817,6 +864,18 @@ export default function App() {
         setUser(me);
         setView(me.role === "admin" ? "admin" : "form");
         setAuthState("in");
+
+        if (me.role !== "admin") {
+          let lastId = null;
+          try { lastId = localStorage.getItem(LAST_PROJECT_KEY); } catch {}
+          if (lastId) {
+            setResuming(true);
+            api.getProject(lastId)
+              .then((p) => setActiveProject(p))
+              .catch(() => { try { localStorage.removeItem(LAST_PROJECT_KEY); } catch {} })
+              .finally(() => setResuming(false));
+          }
+        }
       }).catch(() => {
         signOut(auth);
         setAuthState("out");
@@ -828,13 +887,13 @@ export default function App() {
     api.logout().catch(() => {}).finally(() => signOut(auth));
     setUser(null);
     setAuthState("out");
-    setActiveProject(null);
+    pickProject(null);
     setView("form");
   }
 
   function editProject(id) {
     api.getProject(id).then((p) => {
-      setActiveProject(p);
+      pickProject(p);
       setView("form");
     });
   }
@@ -880,14 +939,18 @@ export default function App() {
       </div>
 
       {activeProject === null ? (
-        <div className="app">
-          <ClientPicker onPicked={(p) => setActiveProject(p)} />
-        </div>
+        resuming ? (
+          <BootLoader />
+        ) : (
+          <div className="app">
+            <ClientPicker onPicked={pickProject} />
+          </div>
+        )
       ) : (
         <ProposalForm
           key={activeProject.id}
           initialProject={activeProject}
-          onExitToPicker={() => setActiveProject(null)}
+          onExitToPicker={() => pickProject(null)}
         />
       )}
     </>
