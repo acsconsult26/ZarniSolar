@@ -4,6 +4,24 @@ Running log of notable changes for AI tooling/session continuity. Newest entries
 
 ---
 
+## 2026-07-29 — Slides 29-34 (Technical Advantages, Mounting Structure, Warranty) + invite-based user auth
+
+**Slides 29-34** (`fields.js`, `pptx_export_v2.py`, `boilerplate.py`, `Admin.jsx`):
+- Slides 29-30 Technical Advantages: two per-proposal richtext fields, each its own slide.
+- Slides 31-33 Mounting Structure: design photos (31) + two "priority install area" photo+note slides (32-33).
+- Slide 34 Warranty: new admin-managed **warranty templates** (named, multi-line, CRUD in Admin → Settings, replaces the old unused single `warranty_lines` textarea) — the proposal form's new Warranty step lets staff pick one per project, resolved at export time.
+- Verified the new pptx slide functions end-to-end with a standalone python-pptx smoke test (no live Firebase needed) before shipping — confirmed richtext/bullets/image+note/placeholder-fallback all render correctly.
+- Slide 35 (Thank You) is still not built -- wasn't requested this round.
+
+**Invite-based user auth** (`users.py`, `Login.jsx`, `ResetPassword.jsx` (new), `Admin.jsx`):
+- Admin now invites a new admin/staff account with just email + name + role, no password field -- backend creates the Firebase Auth user with **no password set**, frontend follows up with a Firebase password-reset email that doubles as the invite-accept link.
+- New in-app `ResetPassword.jsx` page (matches brand styling, not Firebase's generic hosted action page) handles both invite-accept and "Forgot password?" -- verifies the oobCode, takes new password + confirm, then tells the user to sign in again.
+- Admin can resend an invite/reset link per-user from the Users tab.
+- Role separation (staff → proposal form, admin → dashboard) was already enforced in both UI and via `require_admin` on the backend from earlier work -- this only added account provisioning on top of it.
+- Note: the emailed link uses Firebase's default "Password reset" email template wording, which reads a little odd for a first-time invite ("reset" implies a prior password). Customizable in Firebase Console → Authentication → Templates → Password reset if a friendlier invite wording is wanted; Firebase has no separate "invite" template without adding a Cloud Function + custom mail extension.
+
+---
+
 ## 2026-07-29 — Slides 29-34 built (Technical Advantages, Mounting Structure, Warranty templates)
 
 Closes out the 35-slide MRTV reference deck redesign except slide 35 (Thank You, not yet built — trivial, not requested this round).
