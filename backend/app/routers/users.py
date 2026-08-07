@@ -30,17 +30,17 @@ def list_users():
 
 @router.post("", dependencies=[Depends(require_admin)])
 def create_user(body: dict, current=Depends(require_admin)):
+    """Invite-only: creates the Firebase Auth account with no password set.
+    The frontend follows up with a password-reset email, which the invitee
+    uses to set their own password and land back on the login page."""
     email = (body.get("email") or "").strip().lower()
-    password = body.get("password") or ""
-    if not email or not password:
-        raise HTTPException(400, "email and password are required")
-    if len(password) < 8:
-        raise HTTPException(400, "password must be at least 8 characters")
+    if not email:
+        raise HTTPException(400, "email is required")
     role = body.get("role") or "staff"
     if role not in ("admin", "staff"):
         raise HTTPException(400, "role must be 'admin' or 'staff'")
     try:
-        auth_user = fb_auth.create_user(email=email, password=password, display_name=body.get("name", ""))
+        auth_user = fb_auth.create_user(email=email, display_name=body.get("name", ""), email_verified=False)
     except EmailAlreadyExistsError:
         raise HTTPException(409, "A user with this email already exists")
     profile = fdb.set_doc("users", auth_user.uid, {

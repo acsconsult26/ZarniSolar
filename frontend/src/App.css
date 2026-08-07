@@ -217,6 +217,7 @@ footer button:disabled { opacity: 0.45; cursor: default; }
 .admin-login input:focus { outline: none; border-color: var(--brand-blue); box-shadow: 0 0 0 3px rgba(27, 77, 161, 0.12); }
 .admin-login button { padding: 0.7rem; background: var(--brand-blue); color: #fff; border: none; border-radius: 10px; cursor: pointer; font: inherit; font-weight: 600; }
 .admin-login .hint { text-align: center; }
+.admin-login button.login-forgot-link, .admin-login form button.hint { background: none; color: var(--brand-blue); padding: 0.2rem; font-weight: 600; font-size: 0.82rem; text-decoration: underline; }
 
 /* ---------- admin dashboard shell (sidebar + main) ---------- */
 .admin-shell { display: flex; min-height: 100vh; background: var(--bg); }

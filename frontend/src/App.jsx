@@ -6,6 +6,7 @@ import { SECTIONS, perUnitCost, roiCompute, paybackRows } from "./fields";
 import RichText from "./RichText";
 import Admin from "./Admin";
 import Login from "./Login";
+import ResetPassword from "./ResetPassword";
 import "./App.css";
 
 function ProductSelect({ field, value, onChange }) {
@@ -766,6 +767,12 @@ export default function App() {
       setView("form");
     });
   }
+
+  // Password-reset action links (invite-accept and "forgot password" both
+  // land here) work regardless of current sign-in state, so this takes
+  // priority over the normal checking/out/in flow below.
+  const resetOobCode = new URLSearchParams(window.location.search).get("oobCode");
+  if (resetOobCode) return <ResetPassword oobCode={resetOobCode} />;
 
   if (authState === "checking") return <BootLoader />;
   if (authState === "out") return <Login />;

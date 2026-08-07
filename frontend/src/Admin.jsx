@@ -1,5 +1,14 @@
 import { useEffect, useState } from "react";
+import { sendPasswordResetEmail } from "firebase/auth";
 import { api } from "./api";
+import { auth } from "./firebaseClient";
+
+function sendInviteEmail(email) {
+  return sendPasswordResetEmail(auth, email, {
+    url: `${window.location.origin}/`,
+    handleCodeInApp: true,
+  });
+}
 
 const FALLBACK_CATEGORIES = [
   { key: "panel", label: "Solar Panel" },
@@ -560,6 +569,7 @@ function UserModal({ initial, onClose, onSaved }) {
   const [form, setForm] = useState(initial);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [invited, setInvited] = useState(false);
   const editingId = initial.id || null;
 
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })); }
@@ -573,21 +583,48 @@ function UserModal({ initial, onClose, onSaved }) {
         const body = { name: form.name, role: form.role, is_active: form.is_active };
         if (form.password) body.password = form.password;
         await api.updateUser(editingId, body);
+        onSaved();
       } else {
-        await api.createUser({ email: form.email, name: form.name, role: form.role, password: form.password });
+        const email = form.email.trim().toLowerCase();
+        await api.createUser({ email, name: form.name, role: form.role });
+        try {
+          await sendInviteEmail(email);
+        } catch {
+          // account was created either way -- admin can hit "Resend Invite" later
+        }
+        setInvited(true);
+        setBusy(false);
       }
-      onSaved();
     } catch (err) {
       setError(String(err));
       setBusy(false);
     }
   }
 
+  if (invited) {
+    return (
+      <div className="modal-overlay" onMouseDown={onClose}>
+        <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+          <div className="modal-head">
+            <h3>Invite sent</h3>
+            <button type="button" className="modal-close" onClick={onClose}>×</button>
+          </div>
+          <div className="modal-body">
+            <p className="hint">An invite email was sent to <strong>{form.email}</strong>. They'll set their own password and can then sign in.</p>
+          </div>
+          <div className="modal-foot">
+            <button onClick={onSaved}>Done</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="modal-overlay" onMouseDown={onClose}>
       <form className="modal" onMouseDown={(e) => e.stopPropagation()} onSubmit={save}>
         <div className="modal-head">
-          <h3>{editingId ? "Edit User" : "Add User"}</h3>
+          <h3>{editingId ? "Edit User" : "Invite User"}</h3>
           <button type="button" className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
@@ -602,22 +639,25 @@ function UserModal({ initial, onClose, onSaved }) {
             </select>
           </label>
           {editingId && (
-            <label><span>Active</span>
-              <select value={form.is_active === false ? "no" : "yes"} onChange={(e) => set("is_active", e.target.value === "yes")}>
-                <option value="yes">Active</option>
-                <option value="no">Disabled</option>
-              </select>
-            </label>
+            <>
+              <label><span>Active</span>
+                <select value={form.is_active === false ? "no" : "yes"} onChange={(e) => set("is_active", e.target.value === "yes")}>
+                  <option value="yes">Active</option>
+                  <option value="no">Disabled</option>
+                </select>
+              </label>
+              <label><span>New password (leave blank to keep current)</span>
+                <input type="password" value={form.password} onChange={(e) => set("password", e.target.value)} />
+              </label>
+            </>
           )}
-          <label><span>{editingId ? "New password (leave blank to keep current)" : "Password *"}</span>
-            <input type="password" value={form.password} onChange={(e) => set("password", e.target.value)} />
-          </label>
+          {!editingId && <p className="hint">They'll get an email to set their own password — no need to type one here.</p>}
           {error && <p className="error">{error}</p>}
         </div>
         <div className="modal-foot">
           <button type="button" className="ghost" onClick={onClose}>Cancel</button>
-          <button type="submit" disabled={busy || (!editingId && (!form.email.trim() || !form.password))}>
-            {busy ? "Saving…" : editingId ? "Save changes" : "Add user"}
+          <button type="submit" disabled={busy || (!editingId && !form.email.trim())}>
+            {busy ? "Saving…" : editingId ? "Save changes" : "Send invite"}
           </button>
         </div>
       </form>
@@ -628,6 +668,7 @@ function UserModal({ initial, onClose, onSaved }) {
 function UsersTab({ currentEmail }) {
   const [users, setUsers] = useState([]);
   const [modal, setModal] = useState(null);
+  const [resent, setResent] = useState(null);
 
   async function refresh() { setUsers(await api.listUsers()); }
   useEffect(() => { refresh(); }, []);
@@ -642,12 +683,23 @@ function UsersTab({ currentEmail }) {
     }
   }
 
+  async function resendInvite(email) {
+    try {
+      await sendInviteEmail(email);
+      setResent(email);
+      setTimeout(() => setResent(null), 4000);
+    } catch (err) {
+      alert(String(err));
+    }
+  }
+
   return (
     <div className="admin-card">
       <div className="catalog-head">
         <h3>Staff & Admin Accounts ({users.length})</h3>
-        <button className="add-product-btn" onClick={() => setModal(EMPTY_USER)}>+ Add User</button>
+        <button className="add-product-btn" onClick={() => setModal(EMPTY_USER)}>+ Invite User</button>
       </div>
+      {resent && <p className="settings-status">Invite/reset link resent to {resent}.</p>}
       <div className="table-scroll">
       <table className="clients-table">
         <thead>
@@ -663,6 +715,7 @@ function UsersTab({ currentEmail }) {
               <td>{u.last_login_at ? new Date(u.last_login_at).toLocaleString() : "Never"}</td>
               <td className="row-actions">
                 <button onClick={() => setModal({ ...u, password: "" })}>Edit</button>
+                <button onClick={() => resendInvite(u.email)}>{u.last_login_at ? "Reset password" : "Resend invite"}</button>
                 <button className="danger" disabled={u.email === currentEmail} onClick={() => remove(u.id)}>Delete</button>
               </td>
             </tr>
