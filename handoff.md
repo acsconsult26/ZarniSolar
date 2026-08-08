@@ -4,6 +4,18 @@ Running log of notable changes for AI tooling/session continuity. Newest entries
 
 ---
 
+## 2026-08-08 — Real URL navigation (fixes back/forward exiting the app) + Create New Proposal button
+
+**Frontend only** (`App.jsx`, `Admin.jsx`, `App.css`):
+- User reported: clicking "Edit" on a draft from Admin, then pressing browser Back, closed the tab/exited the app instead of returning to the proposal list — happened for both admin and staff flows. Root cause: the SPA never touched the URL, so every internal screen (client picker, a project, each admin tab) lived under the same "/" — there was nothing in browser history to go back to.
+- Fixed with real History API integration: `/` = client picker, `/project/:id` = a proposal, `/admin` / `/admin/:tab` = an admin tab. `App.jsx` has one `navigate()` helper that updates state and pushes/replaces history together, plus a `popstate` listener that re-derives state on back/forward. Admin's tab state moved from `Admin.jsx`-local to controlled-by-`App` (`tab`/`onTabChange` props) so tab clicks push into the same history stack. Reload-resume and the new deep-link/back-forward paths both route through one `initFromLocation()` so a refresh on `/project/:id` or `/admin/settings` lands back on the right screen.
+- Firebase Hosting already had a catch-all SPA rewrite to `index.html`, so no hosting config change was needed for the new real paths.
+- Verified in-browser via the dev-stub technique with mocked fetches: picking a client pushes `/project/:id`, back correctly returns to the picker; clicking through admin tabs pushes `/admin/:tab`, and back correctly walks Settings → Products → Dashboard instead of leaving the app. Found and fixed one bug during verification: an admin landing fresh at `/` rendered the Dashboard but the URL stayed `/` — fixed by replacing to `/admin` in that case, so a later back-navigation to that history entry doesn't land on the staff picker instead.
+- Also added a "Create New Proposal" button (green, success-styled) that appears in the Review & Export section right after a successful PPTX export.
+- Deployed: `firebase deploy --only hosting` only — no backend changes this round.
+
+---
+
 ## 2026-08-07 (7) — Fix Google Maps satellite 403 (EEA account restriction)
 
 **Backend only** (`map_image.py`):
