@@ -1356,9 +1356,9 @@ const PAGE_TITLES = {
   settings: "Settings",
 };
 
-function AdminShell({ onEditClient, onExit, onLogout, currentEmail, userName }) {
-  const [tab, setTab] = useState("dashboard");
+function AdminShell({ onEditClient, onExit, onLogout, currentEmail, userName, tab, onTabChange }) {
   const [collapsed, setCollapsed] = useState(false);
+  const setTab = onTabChange;
 
   return (
     <div className="admin-shell">

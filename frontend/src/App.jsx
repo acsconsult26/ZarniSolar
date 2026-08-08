@@ -521,6 +521,7 @@ function ProposalForm({ initialProject, onExitToPicker }) {
   const [saving, setSaving] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportError, setExportError] = useState(null);
+  const [exportDone, setExportDone] = useState(false);
   const [activeKey, setActiveKey] = useState(SECTIONS[0]?.key);
   const [showTop, setShowTop] = useState(false);
   const sectionRefs = useRef({});
@@ -639,10 +640,12 @@ function ProposalForm({ initialProject, onExitToPicker }) {
   async function handleExport() {
     if (!projectId) return;
     setExportError(null);
+    setExportDone(false);
     setExportBusy(true);
     try {
       await saveDraft();
       await api.exportProject(projectId);
+      setExportDone(true);
     } catch (e) {
       setExportError(String(e));
     } finally {
@@ -812,6 +815,14 @@ function ProposalForm({ initialProject, onExitToPicker }) {
               </button>
             </div>
             {exportError && <p className="error">{exportError}</p>}
+            {exportDone && !exportError && (
+              <div className="export-done">
+                <p className="export-done-msg"><IconExport className="btn-icon" />PPTX exported successfully.</p>
+                <button className="btn btn-success" onClick={onExitToPicker}>
+                  <IconPlus className="btn-icon" />Create New Proposal
+                </button>
+              </div>
+            )}
           </section>
         </main>
       </div>
@@ -835,22 +846,97 @@ function BootLoader() {
 
 const LAST_PROJECT_KEY = "zarni_active_project_id";
 
+// Real URLs for each app state (client picker / a project / an admin tab) so
+// the browser's own back/forward buttons move between them, instead of the
+// SPA rendering everything under a single "/" and back just leaving the app.
+function pathForState(view, activeProject, adminTab) {
+  if (view === "admin") {
+    return adminTab && adminTab !== "dashboard" ? `/admin/${adminTab}` : "/admin";
+  }
+  return activeProject ? `/project/${activeProject.id}` : "/";
+}
+
 export default function App() {
   const [authState, setAuthState] = useState("checking"); // checking | out | in
   const [user, setUser] = useState(null);
   const [view, setView] = useState("form"); // form | admin
   const [activeProject, setActiveProject] = useState(null); // null = show client picker
+  const [adminTab, setAdminTab] = useState("dashboard");
   const [resuming, setResuming] = useState(false);
+
+  // Single place that updates state AND syncs the URL/history so back/forward
+  // works. Pass only the fields that are changing; omitted ones keep their
+  // current value. `replace: true` swaps the current history entry instead
+  // of pushing a new one (used for redirects / initial-load syncing).
+  function navigate(next, { replace = false } = {}) {
+    if (next.view !== undefined) setView(next.view);
+    if (next.activeProject !== undefined) setActiveProject(next.activeProject);
+    if (next.adminTab !== undefined) setAdminTab(next.adminTab);
+
+    const nextView = next.view !== undefined ? next.view : view;
+    const nextProject = next.activeProject !== undefined ? next.activeProject : activeProject;
+    const nextAdminTab = next.adminTab !== undefined ? next.adminTab : adminTab;
+    const path = pathForState(nextView, nextProject, nextAdminTab);
+    if (window.location.pathname === path) return;
+    if (replace) window.history.replaceState({}, "", path);
+    else window.history.pushState({}, "", path);
+  }
 
   // Remembers which project is open so a page reload reopens it instead of
   // dropping back to the client picker (the project's own data is already
   // safe via the server autosave + local draft in ProposalForm).
-  function pickProject(p) {
-    setActiveProject(p);
+  function pickProject(p, opts) {
     try {
       if (p) localStorage.setItem(LAST_PROJECT_KEY, p.id);
       else localStorage.removeItem(LAST_PROJECT_KEY);
     } catch {}
+    navigate({ view: "form", activeProject: p }, opts);
+  }
+
+  // Resolves whatever's already in the address bar (a deep link, or the URL
+  // left over from before a reload) into initial app state. Uses `replace`
+  // throughout since this is syncing to an existing URL, not navigating.
+  function initFromLocation(me) {
+    const path = window.location.pathname;
+    const isAdminUser = me.role === "admin";
+
+    if (path.startsWith("/admin")) {
+      if (!isAdminUser) { window.history.replaceState({}, "", "/"); setView("form"); return; }
+      const tab = path === "/admin" ? "dashboard" : path.slice("/admin/".length) || "dashboard";
+      setView("admin");
+      setAdminTab(tab);
+      return;
+    }
+
+    if (path.startsWith("/project/")) {
+      const id = path.slice("/project/".length);
+      if (id) {
+        setView("form");
+        setResuming(true);
+        api.getProject(id)
+          .then((p) => { setActiveProject(p); try { localStorage.setItem(LAST_PROJECT_KEY, p.id); } catch {} })
+          .catch(() => {
+            window.history.replaceState({}, "", "/");
+            try { localStorage.removeItem(LAST_PROJECT_KEY); } catch {}
+          })
+          .finally(() => setResuming(false));
+        return;
+      }
+    }
+
+    // "/" (or an unrecognized path) -- fall back to the last-open project.
+    setView(isAdminUser ? "admin" : "form");
+    if (!isAdminUser) {
+      let lastId = null;
+      try { lastId = localStorage.getItem(LAST_PROJECT_KEY); } catch {}
+      if (lastId) {
+        setResuming(true);
+        api.getProject(lastId)
+          .then((p) => { setActiveProject(p); window.history.replaceState({}, "", `/project/${p.id}`); })
+          .catch(() => { try { localStorage.removeItem(LAST_PROJECT_KEY); } catch {} })
+          .finally(() => setResuming(false));
+      }
+    }
   }
 
   useEffect(() => {
@@ -862,40 +948,61 @@ export default function App() {
       }
       ensureFreshToken().then(() => api.me()).then((me) => {
         setUser(me);
-        setView(me.role === "admin" ? "admin" : "form");
         setAuthState("in");
-
-        if (me.role !== "admin") {
-          let lastId = null;
-          try { lastId = localStorage.getItem(LAST_PROJECT_KEY); } catch {}
-          if (lastId) {
-            setResuming(true);
-            api.getProject(lastId)
-              .then((p) => setActiveProject(p))
-              .catch(() => { try { localStorage.removeItem(LAST_PROJECT_KEY); } catch {} })
-              .finally(() => setResuming(false));
-          }
-        }
+        initFromLocation(me);
       }).catch(() => {
         signOut(auth);
         setAuthState("out");
       });
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Browser back/forward: re-derive state from the URL the browser just
+  // switched to, without pushing another history entry ourselves.
+  useEffect(() => {
+    function onPopState() {
+      if (authState !== "in") return;
+      const path = window.location.pathname;
+      const isAdminUser = user?.role === "admin";
+
+      if (path.startsWith("/admin")) {
+        if (!isAdminUser) return;
+        const tab = path === "/admin" ? "dashboard" : path.slice("/admin/".length) || "dashboard";
+        setView("admin");
+        setAdminTab(tab);
+        return;
+      }
+
+      if (path.startsWith("/project/")) {
+        const id = path.slice("/project/".length);
+        setView("form");
+        if (String(activeProject?.id) !== id) {
+          api.getProject(id)
+            .then((p) => { setActiveProject(p); try { localStorage.setItem(LAST_PROJECT_KEY, p.id); } catch {} })
+            .catch(() => {});
+        }
+        return;
+      }
+
+      setView("form");
+      setActiveProject(null);
+      try { localStorage.removeItem(LAST_PROJECT_KEY); } catch {}
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [authState, user, activeProject]);
 
   function logout() {
     api.logout().catch(() => {}).finally(() => signOut(auth));
     setUser(null);
     setAuthState("out");
-    pickProject(null);
-    setView("form");
+    setAdminTab("dashboard");
+    pickProject(null, { replace: true });
   }
 
   function editProject(id) {
-    api.getProject(id).then((p) => {
-      pickProject(p);
-      setView("form");
-    });
+    api.getProject(id).then((p) => pickProject(p));
   }
 
   // Password-reset action links (invite-accept and "forgot password" both
@@ -917,8 +1024,10 @@ export default function App() {
         currentEmail={user.email}
         userName={user.name || user.email}
         onEditClient={editProject}
-        onExit={() => setView("form")}
+        onExit={() => navigate({ view: "form" })}
         onLogout={logout}
+        tab={adminTab}
+        onTabChange={(t) => navigate({ adminTab: t })}
       />
     );
   }
@@ -932,7 +1041,7 @@ export default function App() {
         </div>
         <div className="topbar-actions">
           {isAdmin && (
-            <button className="topbar-link" onClick={() => setView("admin")}>Admin</button>
+            <button className="topbar-link" onClick={() => navigate({ view: "admin", adminTab: "dashboard" })}>Admin</button>
           )}
           <button className="icon-btn" title={`Log out (${user?.name || user?.email})`} onClick={logout}><IconLogout /></button>
         </div>

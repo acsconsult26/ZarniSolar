@@ -487,6 +487,13 @@ footer button:disabled { opacity: 0.45; cursor: default; }
 .export-actions .primary.export-btn { background: #1c7a3d; border-color: #1c7a3d; }
 .export-actions .primary.export-btn:hover:not(:disabled) { background: #15602f; }
 
+.export-done {
+  margin-top: 1.25rem; padding: 1.1rem 1.25rem; border-radius: 12px; background: #e7f6ec; border: 1px solid #bfe3ca;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem;
+}
+.export-done-msg { margin: 0; display: flex; align-items: center; gap: 0.5rem; font-weight: 700; color: #1c7a3d; }
+.export-done-msg .btn-icon { width: 18px; height: 18px; }
+
 .new-project-btn { display: inline-flex; align-items: center; gap: 0.35rem; }
 .map-fetch-btn { display: inline-flex; align-items: center; gap: 0.5rem; }
 
