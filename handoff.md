@@ -4,6 +4,34 @@ Running log of notable changes for AI tooling/session continuity. Newest entries
 
 ---
 
+## 2026-08-08 (2) — 15-item batch: bug fixes + proposal form/admin features
+
+**Bug fixes** (highest priority, were blocking real usage):
+- Product-select dropdowns in Product Specifications (`App.jsx` `ProductSelect`) never actually selected anything — Firestore doc IDs are random alphanumeric strings, and `onChange` coerced them with `Number()`, turning every real ID into `NaN`, which never matched any `<option>` value so the select always snapped back to blank. Fixed by keeping the value as a plain string.
+- 401 "Not Authenticated" on export after the form had been open a while: `api.js` cached the Firebase ID token once at sign-in and only refreshed it via the SDK's own background timer, which idle/backgrounded browser tabs can throttle or skip — the cached token could sit expired for the rest of the session. Rewrote `authHeaders()` to call `getIdToken()` fresh on every request (it checks local expiry and auto-refreshes over the network when stale, so this is cheap when the token is still valid).
+- Power analyzer daily-unit calculation (`power_analyzer.py`) now follows the exact formula requested: `Unit(kWh) = Σ(Watt × seconds-between-rows) / (3,600,000)`, with the interval measured once from the first two rows (uniform sampling assumed, not recomputed per row). Feeds `analyzer_stats.avg_daily_kwh`, which the ROI auto-fill now uses instead of the old rough `avg_kw × 24` estimate.
+- Slide 16's Load/Grid/Solar usage chart (`_slide_usage_chart` in `pptx_export_v2.py`) had backwards semantics — Load was computed as `grid + solar` instead of being the client's actual 24h consumption. Fixed: Load is now constant across all option bars (sourced from `roi_total_epc_units`), Grid/Solar vary per option as before.
+
+**Proposal form** (`App.jsx`, `fields.js`, `App.css`):
+- System Options: fixed a CSS grid issue that made option cards 2-4 look like they overlapped (`grid-auto-rows: min-content` + `align-items: start` + `auto-fill` instead of `auto-fit`); product picker within each option is now grouped by category via `<optgroup>`; removed the redundant "Daily Usage Units" baseline field since the chart now derives it automatically.
+- Cross-field auto-copy extended: System Options' CAPEX now feeds ROI's new "System Investment" field, and daily units auto-convert (×30) into the monthly Payback field, alongside the existing unit-cost sync.
+- ROI reworked from a flat "N-year projection" model to a bill/investment/payback model — shows what the client currently pays (MMK/yr), the system's CAPEX, annual savings, and payback period in years. Both the live form preview and the backend's `_slide_roi` were rewritten; the old `roi_years` field is gone, replaced by a `roi_system_cost` field auto-filled from System Options.
+- Export is now a split button — PPTX by default, PDF via a dropdown (backend converts via LibreOffice headless, `pptx_to_pdf.py`; `libreoffice-impress` added to the Docker image). A green "Create New Proposal" box appears after a successful export.
+- Added a 4-template deck-theme picker (Navy & Gold / Emerald / Charcoal / Burgundy) with color-swatch previews in the Review & Export step; selection is stored on the project and threads through to both PPTX and PDF export. `deck_theme.py`'s palette is now thread-local (not a plain module global) so concurrent exports on Cloud Run's threadpool with different themes can't bleed into each other — this was a real concurrency bug I introduced and caught before shipping (bare `GOLD`/`ACCENT`/`PANEL` references inside deck_theme.py's own functions would have thrown `NameError` at import time if left as module-level names after removing the static assignments; fixed by resolving them through `_palette()` everywhere, including default-parameter-value cases like `add_panel(..., color=PANEL)` which had to become `color=None` since defaults are evaluated once at def-time).
+- "Project Solution" (Surveying Data step) is now an admin-managed dropdown instead of free text (`solution-select` field type, mirrors the existing `warranty-select` pattern).
+- Confirmed the existing localStorage draft-mirroring (added in an earlier session) already covers the "accidentally navigating away mid-form" case — no new code needed there.
+
+**Admin panel** (`Admin.jsx`, backend):
+- Inverter spec now includes Weight and Dimensions (W x H x Thickness), matching what Panel already had.
+- System Logs: added real server-side cursor pagination (20/page, newest first, via `firestore_db.query_page`) so browsing logs no longer scans the whole collection every time (was `list_all` + Python slice, unbounded reads). Added a from/to date-range filter and a PDF export (`logs_pdf.py`, reportlab) of the filtered range — the `activity_log.list_recent()` function was replaced entirely (only caller was this router).
+- Added `Admin → Settings → Project Solution Options` card to manage the new dropdown's choices.
+
+Verified via standalone Python smoke tests (all 4 themes produce distinct valid decks; ROI math and chart data checked against hand-computed expected values; PDF generation tested directly) and in-browser via the dev-stub technique for the System Options layout (confirmed non-overlapping via `getBoundingClientRect` — 4 cards, zero pairwise overlaps). A couple of purely-visual pieces (category optgroups, theme-card rendering) hit a test-harness fetch-mock timing limitation rather than an app defect (confirmed the underlying endpoints work via direct fetch) and were verified by code review instead of live screenshot.
+
+Deployed: `firebase deploy --only hosting` (frontend) + `gcloud run deploy` (backend — heavier build this time due to `libreoffice-impress` in the Docker image for PDF export).
+
+---
+
 ## 2026-08-08 — Real URL navigation (fixes back/forward exiting the app) + Create New Proposal button
 
 **Frontend only** (`App.jsx`, `Admin.jsx`, `App.css`):
