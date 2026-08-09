@@ -1,25 +1,23 @@
-import { onIdTokenChanged } from "firebase/auth";
 import { auth } from "./firebaseClient";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
-// Firebase ID tokens are fetched async, but most call sites here build headers
-// synchronously -- so cache the latest token and keep it fresh via the SDK's
-// own onIdTokenChanged (fires on sign-in/out and automatic token refresh).
-let currentToken = null;
-onIdTokenChanged(auth, async (user) => {
-  currentToken = user ? await user.getIdToken() : null;
-});
-
-// Call this before the first request after a sign-in state change (e.g. right
-// after onAuthStateChanged fires) -- onIdTokenChanged above is async, so
-// currentToken can otherwise still be stale/null for a brief window.
+// Fetches a token fresh on every call instead of relying on a passively
+// cached one. getIdToken() checks the token's local expiry and transparently
+// refreshes over the network when it's stale -- previously a single token
+// was cached once at sign-in and only updated by Firebase's own background
+// refresh timer, which browsers can throttle/skip on a backgrounded or
+// long-idle tab. That let an expired token sit in memory for the rest of the
+// session, so a request made after the form had been open for a while (e.g.
+// clicking Export) could 401 with "Not authenticated" even though the user
+// was still properly signed in.
 export async function ensureFreshToken() {
-  currentToken = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+  return auth.currentUser ? auth.currentUser.getIdToken() : null;
 }
 
-function authHeaders() {
-  return currentToken ? { Authorization: `Bearer ${currentToken}` } : {};
+async function authHeaders() {
+  const token = await ensureFreshToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 async function json(resp) {
@@ -31,73 +29,77 @@ async function json(resp) {
 }
 
 export const api = {
-  createProject: (body) =>
+  createProject: async (body) =>
     fetch(`${API_BASE}/projects`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
       body: JSON.stringify(body),
     }).then(json),
 
-  listProjects: () => fetch(`${API_BASE}/projects`, { headers: authHeaders() }).then(json),
+  listProjects: async () => fetch(`${API_BASE}/projects`, { headers: await authHeaders() }).then(json),
 
-  getProject: (id) => fetch(`${API_BASE}/projects/${id}`, { headers: authHeaders() }).then(json),
+  getProject: async (id) => fetch(`${API_BASE}/projects/${id}`, { headers: await authHeaders() }).then(json),
 
-  updateProject: (id, body) =>
+  updateProject: async (id, body) =>
     fetch(`${API_BASE}/projects/${id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
       body: JSON.stringify(body),
     }).then(json),
 
-  uploadField: (id, field, file) => {
+  uploadField: async (id, field, file) => {
     const fd = new FormData();
     fd.append("file", file);
     return fetch(`${API_BASE}/projects/${id}/uploads?field=${encodeURIComponent(field)}`, {
       method: "POST",
-      headers: authHeaders(),
+      headers: await authHeaders(),
       body: fd,
     }).then(json);
   },
 
-  generateSlide19: (id, promptTemplate) =>
+  generateSlide19: async (id, promptTemplate) =>
     fetch(`${API_BASE}/projects/${id}/slide19/generate`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
       body: JSON.stringify({ prompt_template: promptTemplate }),
     }).then(json),
 
-  uploadSlide19Fallback: (id, file) => {
+  uploadSlide19Fallback: async (id, file) => {
     const fd = new FormData();
     fd.append("file", file);
-    return fetch(`${API_BASE}/projects/${id}/slide19/upload`, { method: "POST", headers: authHeaders(), body: fd }).then(json);
+    return fetch(`${API_BASE}/projects/${id}/slide19/upload`, { method: "POST", headers: await authHeaders(), body: fd }).then(json);
   },
 
-  slide21Draft: (id) => fetch(`${API_BASE}/projects/${id}/slide21/draft`, { headers: authHeaders() }).then(json),
+  slide21Draft: async (id) => fetch(`${API_BASE}/projects/${id}/slide21/draft`, { headers: await authHeaders() }).then(json),
 
-  analyzePowerLog: (id, field, file) => {
+  analyzePowerLog: async (id, field, file) => {
     const fd = new FormData();
     fd.append("file", file);
     return fetch(`${API_BASE}/projects/${id}/analyze-power-log?field=${encodeURIComponent(field)}`, {
-      method: "POST", headers: authHeaders(), body: fd,
+      method: "POST", headers: await authHeaders(), body: fd,
     }).then(json);
   },
 
-  fetchMapImage: (id, lat, lng) =>
+  fetchMapImage: async (id, lat, lng) =>
     fetch(`${API_BASE}/projects/${id}/fetch-map-image?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`, {
-      method: "POST", headers: authHeaders(),
+      method: "POST", headers: await authHeaders(),
     }).then(json),
 
   previewFlowchartUrl: (id) => `${API_BASE}/projects/${id}/slide20/preview?t=${Date.now()}`,
 
-  exportProject: async (id) => {
-    const resp = await fetch(`${API_BASE}/projects/${id}/export`, { method: "POST", headers: authHeaders() });
+  exportProject: async (id, format = "pptx") => {
+    const token = await ensureFreshToken();
+    const resp = await fetch(`${API_BASE}/projects/${id}/export?format=${encodeURIComponent(format)}`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
     if (!resp.ok) {
       const text = await resp.text();
       throw new Error(`${resp.status}: ${text}`);
     }
     const disposition = resp.headers.get("Content-Disposition") || "";
     const match = disposition.match(/filename="?([^"]+)"?/);
-    const filename = match ? match[1] : "proposal.pptx";
+    const filename = match ? match[1] : `proposal.${format}`;
     const blob = await resp.blob();
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -116,90 +118,121 @@ export const api = {
     return /^https?:\/\//i.test(path) ? path : `${API_BASE}${path}`;
   },
 
-  deleteProject: (id) =>
-    fetch(`${API_BASE}/projects/${id}`, { method: "DELETE", headers: authHeaders() }).then(json),
+  deleteProject: async (id) =>
+    fetch(`${API_BASE}/projects/${id}`, { method: "DELETE", headers: await authHeaders() }).then(json),
 
   // ---- auth ----
-  me: () => fetch(`${API_BASE}/admin/me`, { headers: authHeaders() }).then(json),
-  logout: () => fetch(`${API_BASE}/admin/logout`, { method: "POST", headers: authHeaders() }).then(json),
+  me: async () => fetch(`${API_BASE}/admin/me`, { headers: await authHeaders() }).then(json),
+  logout: async () => fetch(`${API_BASE}/admin/logout`, { method: "POST", headers: await authHeaders() }).then(json),
 
   // ---- system logs ----
-  listLogs: () => fetch(`${API_BASE}/admin/logs`, { headers: authHeaders() }).then(json),
+  listLogs: async ({ limit = 20, cursor = null, from = null, to = null } = {}) => {
+    const params = new URLSearchParams();
+    params.set("limit", String(limit));
+    if (cursor) params.set("cursor", cursor);
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    return fetch(`${API_BASE}/admin/logs?${params.toString()}`, { headers: await authHeaders() }).then(json);
+  },
+  exportLogsPdf: async ({ from = null, to = null } = {}) => {
+    const params = new URLSearchParams();
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    const token = await ensureFreshToken();
+    const resp = await fetch(`${API_BASE}/admin/logs/export.pdf?${params.toString()}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!resp.ok) {
+      const text = await resp.text();
+      throw new Error(`${resp.status}: ${text}`);
+    }
+    const blob = await resp.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "system-logs.pdf";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  },
 
   // ---- clients ----
-  listClients: () => fetch(`${API_BASE}/clients`, { headers: authHeaders() }).then(json),
-  getClient: (id) => fetch(`${API_BASE}/clients/${id}`, { headers: authHeaders() }).then(json),
-  createClient: (body) =>
+  listClients: async () => fetch(`${API_BASE}/clients`, { headers: await authHeaders() }).then(json),
+  getClient: async (id) => fetch(`${API_BASE}/clients/${id}`, { headers: await authHeaders() }).then(json),
+  createClient: async (body) =>
     fetch(`${API_BASE}/clients`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
       body: JSON.stringify(body),
     }).then(json),
-  updateClient: (id, body) =>
+  updateClient: async (id, body) =>
     fetch(`${API_BASE}/clients/${id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
       body: JSON.stringify(body),
     }).then(json),
-  deleteClient: (id) =>
-    fetch(`${API_BASE}/clients/${id}`, { method: "DELETE", headers: authHeaders() }).then(json),
+  deleteClient: async (id) =>
+    fetch(`${API_BASE}/clients/${id}`, { method: "DELETE", headers: await authHeaders() }).then(json),
 
   // ---- users (admin only) ----
-  listUsers: () => fetch(`${API_BASE}/users`, { headers: authHeaders() }).then(json),
-  createUser: (body) =>
+  listUsers: async () => fetch(`${API_BASE}/users`, { headers: await authHeaders() }).then(json),
+  createUser: async (body) =>
     fetch(`${API_BASE}/users`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
       body: JSON.stringify(body),
     }).then(json),
-  updateUser: (id, body) =>
+  updateUser: async (id, body) =>
     fetch(`${API_BASE}/users/${id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
       body: JSON.stringify(body),
     }).then(json),
-  deleteUser: (id) =>
-    fetch(`${API_BASE}/users/${id}`, { method: "DELETE", headers: authHeaders() }).then(json),
+  deleteUser: async (id) =>
+    fetch(`${API_BASE}/users/${id}`, { method: "DELETE", headers: await authHeaders() }).then(json),
 
   // ---- admin: products & boilerplate ----
-  listProductsAll: () => fetch(`${API_BASE}/admin/products`).then(json),
+  listProductsAll: async () => fetch(`${API_BASE}/admin/products`).then(json),
 
-  createProduct: (token, body) =>
+  listPptxThemes: async () => fetch(`${API_BASE}/admin/pptx-themes`).then(json),
+
+  createProduct: async (token, body) =>
     fetch(`${API_BASE}/admin/products`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
       body: JSON.stringify(body),
     }).then(json),
 
-  updateProduct: (token, id, body) =>
+  updateProduct: async (token, id, body) =>
     fetch(`${API_BASE}/admin/products/${id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
       body: JSON.stringify(body),
     }).then(json),
 
-  deleteProduct: (token, id) =>
+  deleteProduct: async (token, id) =>
     fetch(`${API_BASE}/admin/products/${id}`, {
       method: "DELETE",
-      headers: authHeaders(),
+      headers: await authHeaders(),
     }).then(json),
 
-  uploadProductImage: (token, id, file) => {
+  uploadProductImage: async (token, id, file) => {
     const fd = new FormData();
     fd.append("file", file);
     return fetch(`${API_BASE}/admin/products/${id}/image`, {
       method: "POST",
-      headers: authHeaders(),
+      headers: await authHeaders(),
       body: fd,
     }).then(json);
   },
 
-  getBoilerplate: (key) => fetch(`${API_BASE}/admin/boilerplate/${key}`).then(json),
+  getBoilerplate: async (key) => fetch(`${API_BASE}/admin/boilerplate/${key}`).then(json),
 
-  putBoilerplate: (token, key, value) =>
+  putBoilerplate: async (token, key, value) =>
     fetch(`${API_BASE}/admin/boilerplate/${key}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
       body: JSON.stringify(value),
     }).then(json),
 };

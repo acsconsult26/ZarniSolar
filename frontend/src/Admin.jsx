@@ -7,7 +7,7 @@ import { ToastProvider, useToast } from "./Toast";
 import { LoadingBlock, SkeletonRows, FadeIn } from "./Loading";
 import {
   IconEdit, IconTrash, IconSearch, IconBuilding, IconBranch, IconMessage, IconSparkle,
-  IconMail, IconRefresh, IconWarranty, IconPlus, IconSave, IconLogout,
+  IconMail, IconRefresh, IconWarranty, IconPlus, IconSave, IconLogout, IconOptions, IconExport,
 } from "./icons";
 
 function sendInviteEmail(email) {
@@ -43,6 +43,8 @@ const SPEC_FIELDS = {
     { label: "PV Strings per MPPT", unit: "" },
     { label: "Max. Input Current per MPPT", unit: "A" },
     { label: "Max. Short-circuit Current per MPPT", unit: "A" },
+    { label: "Weight", unit: "kg" },
+    { label: "Dimension (W x H x Thickness)", unit: "mm" },
   ],
   battery: [
     { label: "Battery Type", unit: "" },
@@ -576,30 +578,94 @@ const LOG_ACTION_LABELS = {
   "user.delete": "Deleted user",
 };
 
+const LOGS_PAGE_SIZE = 20;
+
 function LogsTab() {
+  const toast = useToast();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const [cursors, setCursors] = useState([undefined]); // cursors[i] = cursor to fetch page i
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [exporting, setExporting] = useState(false);
+
+  async function loadPage(pageIdx, cursorList, range) {
+    setLoading(true);
+    try {
+      const res = await api.listLogs({ limit: LOGS_PAGE_SIZE, cursor: cursorList[pageIdx], from: range.from || null, to: range.to || null });
+      setRows(res.items);
+      setHasMore(res.has_more);
+      if (res.next_cursor && cursorList.length === pageIdx + 1) {
+        setCursors([...cursorList, res.next_cursor]);
+      }
+    } catch (err) {
+      toast.error(String(err));
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    api.listLogs().then(setRows).finally(() => setLoading(false));
-  }, []);
+    setPage(0);
+    setCursors([undefined]);
+    loadPage(0, [undefined], { from: fromDate, to: toDate });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fromDate, toDate]);
+
+  function goNext() {
+    if (!hasMore) return;
+    const p = page + 1;
+    setPage(p);
+    loadPage(p, cursors, { from: fromDate, to: toDate });
+  }
+  function goPrev() {
+    if (page === 0) return;
+    const p = page - 1;
+    setPage(p);
+    loadPage(p, cursors, { from: fromDate, to: toDate });
+  }
+
+  async function exportPdf() {
+    setExporting(true);
+    try {
+      await api.exportLogsPdf({ from: fromDate || null, to: toDate || null });
+    } catch (err) {
+      toast.error(String(err));
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <FadeIn>
     <div className="admin-card">
       <div className="catalog-head">
-        <h3>System Logs {rows.length > 0 && `(${rows.length})`}</h3>
+        <h3>System Logs</h3>
+        <div className="catalog-filters">
+          <label className="logs-date-field"><span>From</span>
+            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+          </label>
+          <label className="logs-date-field"><span>To</span>
+            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          </label>
+          <button className="btn btn-ghost" onClick={exportPdf} disabled={exporting}>
+            <IconExport className="btn-icon" />{exporting ? "Exporting…" : "Export PDF"}
+          </button>
+        </div>
       </div>
       {loading ? (
         <SkeletonRows rows={6} />
       ) : (
+      <>
       <div className="table-scroll">
       <table className="clients-table">
         <thead>
           <tr><th>When</th><th>User</th><th>Action</th><th>Detail</th></tr>
         </thead>
         <tbody>
-          {rows.length === 0 && <tr><td colSpan={4} className="empty-row">No activity recorded yet.</td></tr>}
+          {rows.length === 0 && <tr><td colSpan={4} className="empty-row">No activity recorded in this period.</td></tr>}
           {rows.map((r) => (
             <tr key={r.id}>
               <td>{r.created_at ? new Date(r.created_at).toLocaleString() : "—"}</td>
@@ -611,6 +677,12 @@ function LogsTab() {
         </tbody>
       </table>
       </div>
+      <div className="logs-pagination">
+        <button className="btn btn-ghost" onClick={goPrev} disabled={page === 0}>← Newer</button>
+        <span className="logs-page-label">Page {page + 1}</span>
+        <button className="btn btn-ghost" onClick={goNext} disabled={!hasMore}>Older →</button>
+      </div>
+      </>
       )}
     </div>
     </FadeIn>
@@ -938,6 +1010,82 @@ function DashboardTab({ onGoTo }) {
   );
 }
 
+function ProjectSolutionOptionsCard({ token }) {
+  const toast = useToast();
+  const [options, setOptions] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api.getBoilerplate("project_solution_options").then((o) => setOptions(o || [])).catch(() => setOptions([]));
+  }, []);
+
+  function setOption(i, value) {
+    setOptions((o) => o.map((v, idx) => (idx === i ? value : v)));
+  }
+  function addOption() { setOptions((o) => [...o, ""]); }
+  function removeOption(i) { setOptions((o) => o.filter((_, idx) => idx !== i)); }
+
+  async function save() {
+    setSaving(true);
+    try {
+      const cleaned = options.map((v) => v.trim()).filter(Boolean);
+      await api.putBoilerplate(token, "project_solution_options", cleaned);
+      setOptions(cleaned);
+      toast.success("Project Solution options saved — pick one in the Surveying Data step.");
+    } catch (err) {
+      toast.error(String(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="admin-card settings-card">
+      <div className="settings-card-head">
+        <span className="settings-card-icon advanced"><IconOptions /></span>
+        <div>
+          <h3>Project Solution Options</h3>
+          <p className="hint">Choices for the Surveying Data step's "Project Solution" dropdown.</p>
+        </div>
+      </div>
+
+      {options === null ? (
+        <SkeletonRows rows={2} />
+      ) : (
+        <>
+          <AnimatePresence initial={false}>
+            {options.map((v, i) => (
+              <motion.div
+                key={i}
+                className="branch-block"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.25 }}
+              >
+                <div className="warranty-block-row">
+                  <input className="grow" value={v} placeholder="e.g. ESS + Solar Solution" onChange={(e) => setOption(i, e.target.value)} />
+                  <button type="button" className="btn-icon-danger" title="Remove option" onClick={() => removeOption(i)}>
+                    <IconTrash />
+                  </button>
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+          {options.length === 0 && <p className="hint">No options yet — add one below.</p>}
+
+          <div className="settings-card-actions">
+            <button type="button" className="btn btn-ghost" onClick={addOption}><IconPlus className="btn-icon" />Add Option</button>
+            <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
+              <IconSave className="btn-icon" />{saving ? "Saving…" : "Save Options"}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function WarrantyTemplatesCard({ token }) {
   const toast = useToast();
   const [templates, setTemplates] = useState(null);
@@ -1224,6 +1372,8 @@ function SettingsTab({ token }) {
         </div>
 
         <WarrantyTemplatesCard token={token} />
+
+        <ProjectSolutionOptionsCard token={token} />
 
         <div className="admin-card settings-card">
           <div className="settings-card-head">

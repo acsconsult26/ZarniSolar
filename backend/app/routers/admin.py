@@ -31,6 +31,25 @@ def logout(user=Depends(get_current_user)):
     return {"ok": True}
 
 
+@router.get("/pptx-themes")
+def list_pptx_themes():
+    from ..services.deck_theme import THEMES
+
+    def hex_of(rgb):
+        return f"#{rgb}"
+
+    return [
+        {
+            "id": theme_id,
+            "label": theme["label"],
+            "description": theme["description"],
+            "bg": hex_of(theme["BG"]), "panel": hex_of(theme["PANEL"]),
+            "accent": hex_of(theme["ACCENT"]), "gold": hex_of(theme["GOLD"]),
+        }
+        for theme_id, theme in THEMES.items()
+    ]
+
+
 @router.get("/boilerplate/{key}")
 def get_boilerplate(key: str):
     if key not in BOILERPLATE_DEFAULTS:

@@ -87,9 +87,7 @@ VARIABLE_DEFAULTS = {
     "roi_epc_with_solar_units": None,   # daily EPC units still used with solar
     "roi_solar_units": None,            # daily solar units
     "roi_avg_unit_cost": None,          # MMK per unit
-    "roi_years": 5,                     # 1-10
-    # slide 16 - usage comparison chart baseline ("Daily Usage Unit" group)
-    "chart_daily_usage": None,
+    "roi_system_cost": None,            # MMK, one-time system investment (CAPEX)
     # slide 17 - payback comparison table (globals; per-option values live in system_options)
     "payback_epc_units_month": None,   # total EPC units per month (same for all options)
     "payback_unit_cost": None,         # MMK per unit

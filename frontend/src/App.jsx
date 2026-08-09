@@ -19,7 +19,7 @@ function ProductSelect({ field, value, onChange }) {
     <label className="field">
       <FieldLabel field={field} />
       {field.help && <small className="field-help">{field.help}</small>}
-      <select value={value ?? ""} onChange={(e) => onChange(field.name, e.target.value ? Number(e.target.value) : "")}>
+      <select value={value ?? ""} onChange={(e) => onChange(field.name, e.target.value || "")}>
         <option value="">— none —</option>
         {options.map((p) => (
           <option key={p.id} value={p.id}>{p.brand} {p.model_name}</option>
@@ -48,6 +48,25 @@ function WarrantySelect({ field, value, onChange }) {
   );
 }
 
+function SolutionSelect({ field, value, onChange }) {
+  const [options, setOptions] = useState([]);
+  useEffect(() => {
+    api.getBoilerplate("project_solution_options").then((o) => setOptions(o || [])).catch(() => {});
+  }, []);
+  return (
+    <label className="field">
+      <FieldLabel field={field} />
+      {field.help && <small className="field-help">{field.help}</small>}
+      <select value={value ?? ""} onChange={(e) => onChange(field.name, e.target.value)}>
+        <option value="">— none —</option>
+        {options.map((o) => (
+          <option key={o} value={o}>{o}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function FieldLabel({ field }) {
   const Icon = fieldIcon(field);
   return (
@@ -61,6 +80,9 @@ function Field({ field, value, onChange }) {
   }
   if (field.type === "warranty-select") {
     return <WarrantySelect field={field} value={value} onChange={onChange} />;
+  }
+  if (field.type === "solution-select") {
+    return <SolutionSelect field={field} value={value} onChange={onChange} />;
   }
   if (field.type === "richtext") {
     return (
@@ -242,6 +264,12 @@ function PowerAnalyzer({ config, projectId, data, uploads, setField, setUploads 
       {status === "done" && stats && (
         <div className="pa-result">
           {stats.date_range && <p className="pa-date-range">Recorded {stats.date_range} (used as the slide subtitle)</p>}
+          {stats.avg_daily_kwh != null && (
+            <p className="pa-date-range">
+              Daily consumption ≈ <strong>{stats.avg_daily_kwh.toLocaleString()} units/day</strong>
+              {" "}(sample interval {stats.sample_interval_seconds}s — used to auto-fill ROI's daily usage)
+            </p>
+          )}
           <div className="pa-stats-grid">
             {stat("kW", "avg_kw", "peak_kw", " kW")}
             {stat("PF", "avg_pf", "peak_pf")}
@@ -262,7 +290,18 @@ function PowerAnalyzer({ config, projectId, data, uploads, setField, setUploads 
 
 function SystemOptions({ data, setField }) {
   const [catalog, setCatalog] = useState([]);
+  const [categories, setCategories] = useState([]);
   useEffect(() => { api.listProductsAll().then(setCatalog).catch(() => setCatalog([])); }, []);
+  useEffect(() => { api.getBoilerplate("product_categories").then((c) => setCategories(c || [])).catch(() => {}); }, []);
+
+  const categoryLabel = (key) => categories.find((c) => c.key === key)?.label || key;
+  // Group the catalog by category so the picker reads as labeled sections
+  // (Solar Panel / Inverter / Battery / …) instead of one long flat list
+  // that's hard to scan for the right item.
+  const catalogByCategory = catalog.reduce((acc, p) => {
+    (acc[p.category] = acc[p.category] || []).push(p);
+    return acc;
+  }, {});
 
   const options = data.system_options || [];
   const update = (next) => setField("system_options", next);
@@ -308,8 +347,12 @@ function SystemOptions({ data, setField }) {
                 <div className="option-item-row">
                   <select value="" onChange={(e) => { pickProduct(i, j, e.target.value); e.target.value = ""; }}>
                     <option value="">{it.name ? "↺ change product" : "Pick product…"}</option>
-                    {catalog.map((p) => (
-                      <option key={p.id} value={p.id}>{p.brand} {p.model_name}</option>
+                    {Object.entries(catalogByCategory).map(([cat, products]) => (
+                      <optgroup key={cat} label={categoryLabel(cat)}>
+                        {products.map((p) => (
+                          <option key={p.id} value={p.id}>{p.brand} {p.model_name}</option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
                   <button type="button" className="remove-x" onClick={() => removeItem(i, j)}>×</button>
@@ -359,11 +402,6 @@ function SystemOptions({ data, setField }) {
       </div>
       {options.length < 4 && <button className="add-option-btn" onClick={addOption}>+ Add Option ({options.length}/4)</button>}
       {catalog.length === 0 && <p className="hint">No catalog products yet — add products in Admin → Products first.</p>}
-      <label className="baseline-field">
-        <span>Daily Usage Units (chart baseline — Slide 16)</span>
-        <input type="number" value={data.chart_daily_usage ?? ""} placeholder="e.g. 900"
-               onChange={(e) => setField("chart_daily_usage", e.target.value)} />
-      </label>
     </div>
   );
 }
@@ -478,6 +516,37 @@ function ClientPicker({ onPicked }) {
   );
 }
 
+function ThemePicker({ value, onChange }) {
+  const [themes, setThemes] = useState([]);
+  useEffect(() => { api.listPptxThemes().then(setThemes).catch(() => {}); }, []);
+  if (themes.length === 0) return null;
+  const selected = value || themes[0]?.id;
+  return (
+    <div className="theme-picker">
+      <h3>Choose a Deck Template</h3>
+      <p className="hint">Pick the color theme for the exported PowerPoint/PDF.</p>
+      <div className="theme-picker-grid">
+        {themes.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            className={`theme-card${selected === t.id ? " selected" : ""}`}
+            onClick={() => onChange(t.id)}
+          >
+            <div className="theme-card-preview" style={{ background: t.bg }}>
+              <span className="theme-card-tick" style={{ background: t.gold }} />
+              <span className="theme-card-title-bar" style={{ background: t.panel }} />
+              <span className="theme-card-accent-bar" style={{ background: t.accent }} />
+            </div>
+            <span className="theme-card-label">{t.label}</span>
+            <span className="theme-card-desc">{t.description}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function FormSection({ section, isReview, children, registerRef }) {
   const ref = useRef(null);
   const [visible, setVisible] = useState(false);
@@ -522,6 +591,7 @@ function ProposalForm({ initialProject, onExitToPicker }) {
   const [exportBusy, setExportBusy] = useState(false);
   const [exportError, setExportError] = useState(null);
   const [exportDone, setExportDone] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [activeKey, setActiveKey] = useState(SECTIONS[0]?.key);
   const [showTop, setShowTop] = useState(false);
   const sectionRefs = useRef({});
@@ -600,12 +670,14 @@ function ProposalForm({ initialProject, onExitToPicker }) {
   // Carry the Electricity Bill numbers (total EPC units + derived unit cost)
   // into the ROI / Payback steps as defaults, so the same figures don't need
   // to be retyped -- only fills fields the user hasn't already set. Falls
-  // back to the Power Analyzer's Avg kW × 24h (a daily-usage estimate) when
-  // the bill's Total EPC Units hasn't been entered.
+  // back to the Power Analyzer's measured daily kWh (integrated from the
+  // actual log samples, not a rough avg-kW × 24h estimate) when the bill's
+  // Total EPC Units hasn't been entered.
   useEffect(() => {
     const unitCost = perUnitCost(data);
-    const analyzerAvgKw = data.analyzer_stats?.avg_kw;
-    const analyzerDailyUnits = analyzerAvgKw != null ? Math.round(analyzerAvgKw * 24) : null;
+    const analyzerDailyKwh = data.analyzer_stats?.avg_daily_kwh;
+    const analyzerDailyUnits = analyzerDailyKwh != null ? Math.round(analyzerDailyKwh) : null;
+    const firstOptionCapex = (data.system_options || [])[0]?.capex;
     setData((d) => {
       const patch = {};
       if (d.roi_total_epc_units === undefined || d.roi_total_epc_units === "") {
@@ -615,16 +687,23 @@ function ProposalForm({ initialProject, onExitToPicker }) {
           patch.roi_total_epc_units = analyzerDailyUnits;
         }
       }
+      const dailyUnits = patch.roi_total_epc_units ?? d.roi_total_epc_units;
+      if ((d.payback_epc_units_month === undefined || d.payback_epc_units_month === "") && dailyUnits) {
+        patch.payback_epc_units_month = Math.round(Number(dailyUnits) * 30);
+      }
       if ((d.roi_avg_unit_cost === undefined || d.roi_avg_unit_cost === "") && unitCost) {
         patch.roi_avg_unit_cost = unitCost;
       }
       if ((d.payback_unit_cost === undefined || d.payback_unit_cost === "") && unitCost) {
         patch.payback_unit_cost = unitCost;
       }
+      if ((d.roi_system_cost === undefined || d.roi_system_cost === "") && firstOptionCapex) {
+        patch.roi_system_cost = firstOptionCapex;
+      }
       return Object.keys(patch).length ? { ...d, ...patch } : d;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data.total_epc_units, data.total_epc_cost, data.analyzer_stats]);
+  }, [data.total_epc_units, data.total_epc_cost, data.analyzer_stats, data.roi_total_epc_units, data.system_options]);
 
   async function saveDraft() {
     if (!projectId) return;
@@ -637,14 +716,14 @@ function ProposalForm({ initialProject, onExitToPicker }) {
     }
   }
 
-  async function handleExport() {
+  async function handleExport(format = "pptx") {
     if (!projectId) return;
     setExportError(null);
     setExportDone(false);
     setExportBusy(true);
     try {
       await saveDraft();
-      await api.exportProject(projectId);
+      await api.exportProject(projectId, format);
       setExportDone(true);
     } catch (e) {
       setExportError(String(e));
@@ -728,11 +807,13 @@ function ProposalForm({ initialProject, onExitToPicker }) {
                       return (
                         <div className="totals">
                           <h3>ROI Calculation (live)</h3>
-                          <p className="hint">EPC : Solar = <strong>{r.ratio}</strong> ({r.epcPct}% : {r.solarPct}%)</p>
+                          <p className="hint">Grid usage without solar : with solar = <strong>{r.ratio}</strong> ({r.epcPct}% : {r.solarPct}%)</p>
                           <ul>
-                            <li>EPC-only — annual: {mmk(r.annualEpc)} MMK · {r.years} yr: <strong>{mmk(r.totalEpc)} MMK</strong></li>
-                            <li>Solar — annual: {mmk(r.annualSolar)} MMK · {r.years} yr: <strong>{mmk(r.totalSolar)} MMK</strong></li>
-                            <li>Savings over {r.years} yr: <strong>{mmk(r.savings)} MMK</strong></li>
+                            <li>Client pays now (annual bill): <strong>{mmk(r.annualBillNow)} MMK/yr</strong></li>
+                            <li>Bill remaining with solar: {mmk(r.annualBillWithSolar)} MMK/yr</li>
+                            <li>Annual savings: <strong>{mmk(r.annualSavings)} MMK/yr</strong></li>
+                            <li>System investment (CAPEX): {mmk(r.systemCost)} MMK</li>
+                            <li>Return on investment: <strong>{r.paybackYears != null ? `${r.paybackYears.toFixed(1)} years` : "—"}</strong></li>
                           </ul>
                         </div>
                       );
@@ -806,18 +887,44 @@ function ProposalForm({ initialProject, onExitToPicker }) {
                 <p className="section-note">The proposal deck is generated as a dark-themed PowerPoint.</p>
               </div>
             </div>
+            <ThemePicker value={data.pptx_theme} onChange={(id) => setField("pptx_theme", id)} />
             <div className="export-actions">
               <button className="save-btn" onClick={saveDraft} disabled={saving}>
                 <IconSave className="btn-icon" />{saving ? "Saving..." : "Save Draft"}
               </button>
-              <button className="primary export-btn" onClick={handleExport} disabled={exportBusy}>
-                <IconExport className="btn-icon" />{exportBusy ? "Exporting..." : "Export PPTX"}
-              </button>
+              <div className="export-split">
+                <button
+                  className="primary export-btn export-split-main"
+                  onClick={() => handleExport("pptx")}
+                  disabled={exportBusy}
+                >
+                  <IconExport className="btn-icon" />{exportBusy ? "Exporting..." : "Export PPTX"}
+                </button>
+                <button
+                  type="button"
+                  className="primary export-btn export-split-toggle"
+                  onClick={() => setShowExportMenu((v) => !v)}
+                  disabled={exportBusy}
+                  title="Choose export format"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+                </button>
+                {showExportMenu && (
+                  <div className="export-split-menu" onMouseLeave={() => setShowExportMenu(false)}>
+                    <button type="button" onClick={() => { setShowExportMenu(false); handleExport("pptx"); }}>
+                      <IconExport className="btn-icon" />Export as PowerPoint (.pptx)
+                    </button>
+                    <button type="button" onClick={() => { setShowExportMenu(false); handleExport("pdf"); }}>
+                      <IconExport className="btn-icon" />Export as PDF (.pdf)
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
             {exportError && <p className="error">{exportError}</p>}
             {exportDone && !exportError && (
               <div className="export-done">
-                <p className="export-done-msg"><IconExport className="btn-icon" />PPTX exported successfully.</p>
+                <p className="export-done-msg"><IconExport className="btn-icon" />Exported successfully.</p>
                 <button className="btn btn-success" onClick={onExitToPicker}>
                   <IconPlus className="btn-icon" />Create New Proposal
                 </button>

@@ -187,6 +187,17 @@ def analyze_power_log(file_bytes: bytes, filename: str = "") -> dict:
 
     date_range = f"{times[0].strftime('%d.%b.%y')} – {times[-1].strftime('%d.%b.%y')}"
 
+    # Daily energy consumption: Unit (kWh) = Σ (Watt_of_row × seconds_between_rows) / (3600 × 1000).
+    # The analyzer logs at a fixed interval, so the seconds-between-rows term
+    # only needs to be measured once, from the first two rows -- not
+    # recomputed per row -- then applied uniformly to every sample.
+    sample_interval_seconds = (times[1] - times[0]).total_seconds() if len(times) > 1 else 0.0
+    # kw_series is already Watts/1000 (see _num_power), so
+    # Σ(W × Δt)/(3600×1000) == Σ(kW) × Δt/3600.
+    total_kwh = sum(kw_series) * sample_interval_seconds / 3600
+    span_days = (times[-1] - times[0]).total_seconds() / 86400
+    avg_daily_kwh = round(total_kwh / span_days, 2) if span_days > 0 else round(total_kwh, 2)
+
     return {
         "sample_count": len(kw_series),
         "start_time": times[0].isoformat(),
@@ -200,5 +211,8 @@ def analyze_power_log(file_bytes: bytes, filename: str = "") -> dict:
         "peak_thd_voltage": _peak(thd_v_series),
         "avg_thd_current": _avg(thd_i_series),
         "peak_thd_current": _peak(thd_i_series),
+        "sample_interval_seconds": round(sample_interval_seconds, 1),
+        "total_kwh": round(total_kwh, 2),
+        "avg_daily_kwh": avg_daily_kwh,
         "hourly": hourly,
     }

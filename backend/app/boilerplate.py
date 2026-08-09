@@ -31,6 +31,14 @@ BOILERPLATE_DEFAULTS = {
     ],
     # Shown on the final "Thank You" slide of every deck.
     "thank_you_message": "Zarni Electronic မှ တပ်ဆင်ပေးထားသော Sigenergy Brand သည် တပ်ဆင်ထားသည်မှ ယနေ့အချိန်...",
+    # Admin-managed choices for the Surveying Data step's "Project Solution"
+    # dropdown, so staff pick from a consistent list instead of free-typing.
+    "project_solution_options": [
+        "ESS + Solar Solution",
+        "Solar Only Solution",
+        "ESS Only Solution",
+        "Grid-Tied Solar Solution",
+    ],
     "reference_projects": [],
     "reference_sites_table": [],
     "slide19_prompt_template": DEFAULT_PROMPT_TEMPLATE,

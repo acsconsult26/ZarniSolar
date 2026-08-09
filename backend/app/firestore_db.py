@@ -59,6 +59,43 @@ def query_eq(collection: str, field: str, value) -> list[dict]:
     return [_doc_to_dict(d) for d in q.stream()]
 
 
+def query_page(
+    collection: str,
+    order_by: str,
+    *,
+    descending: bool = True,
+    limit: int = 20,
+    cursor: datetime.datetime | None = None,
+    date_from: datetime.datetime | None = None,
+    date_to: datetime.datetime | None = None,
+    date_field: str | None = None,
+) -> tuple[list[dict], bool]:
+    """Cursor-paginated, server-side-filtered query -- fetches only `limit`
+    documents (plus one to detect a next page) instead of the whole
+    collection, unlike `list_all`. Returns (rows, has_more).
+
+    `cursor` is the `order_by` value of the last row from the previous page
+    (an ISO datetime for `created_at`-style fields). `date_from`/`date_to`
+    filter on `date_field` (defaults to `order_by`) -- pass both to scope an
+    export to a period without a full collection scan."""
+    date_field = date_field or order_by
+    q = db.collection(collection)
+    if date_from is not None:
+        q = q.where(filter=FieldFilter(date_field, ">=", date_from))
+    if date_to is not None:
+        q = q.where(filter=FieldFilter(date_field, "<=", date_to))
+    direction = "DESCENDING" if descending else "ASCENDING"
+    q = q.order_by(order_by, direction=direction)
+    if cursor is not None:
+        q = q.start_after({order_by: cursor})
+    # Fetch one extra row to know whether another page exists, without a
+    # separate count query (which would itself scan the whole range).
+    docs = list(q.limit(limit + 1).stream())
+    has_more = len(docs) > limit
+    rows = [_doc_to_dict(d) for d in docs[:limit]]
+    return rows, has_more
+
+
 def update(collection: str, doc_id: str, patch: dict) -> Optional[dict]:
     ref = db.collection(collection).document(doc_id)
     if not ref.get().exists:

@@ -53,7 +53,9 @@ class _Imgs:
 
 
 def export_project_v2(project, storage, company_info=None, selected_products=None,
-                      introduction_message=None, thank_you_message=None, warranty_template=None) -> bytes:
+                      introduction_message=None, thank_you_message=None, warranty_template=None,
+                      theme=None) -> bytes:
+    T.use_theme(theme)
     data = project.data or {}
     v = merged_field_values(data)
     ci = company_info or {}
@@ -107,7 +109,7 @@ def export_project_v2(project, storage, company_info=None, selected_products=Non
                                          or o.get("solar_units") not in (None, ""))]
     if chart_opts:
         page = len(prs.slides._sldIdLst) + 1
-        _slide_usage_chart(prs, data, chart_opts, company_name, page)
+        _slide_usage_chart(prs, v, chart_opts, company_name, page)
 
     # Slide 17 : payback comparison table
     if options and (data.get("payback_epc_units_month") or any(o.get("payback_years") for o in options)):
@@ -614,13 +616,12 @@ def _slide_roi(prs, v, company_name, page):
     n2 = _num(v.get("roi_epc_with_solar_units"))
     n3 = _num(v.get("roi_solar_units"))
     cost = _num(v.get("roi_avg_unit_cost"))
-    years = int(_num(v.get("roi_years")) or 5)
+    system_cost = _num(v.get("roi_system_cost"))
 
-    annual_epc = n1 * 30 * 12 * cost
-    annual_solar = n3 * 30 * 12 * cost
-    total_epc = annual_epc * years
-    total_solar = annual_solar * years
-    savings = total_epc - total_solar
+    annual_bill_now = n1 * 30 * 12 * cost
+    annual_bill_with_solar = n2 * 30 * 12 * cost
+    annual_savings = annual_bill_now - annual_bill_with_solar
+    payback_years = (system_cost / annual_savings) if annual_savings > 0 else None
 
     def i(x):
         return f"{x:,.0f}"
@@ -641,10 +642,10 @@ def _slide_roi(prs, v, company_name, page):
                size=15, color=T.GOLD, italic=True)
     tbl_top = top + Inches(0.65)
 
-    # 3 rows x 2 cols table
+    # 3 rows x 2 cols table: current bill vs. bill with solar
     left = Inches(0.7)
     width = prs.slide_width - Inches(1.4)
-    height = prs.slide_height - tbl_top - Inches(1.2)
+    height = prs.slide_height - tbl_top - Inches(1.55)
     gf = slide.shapes.add_table(3, 2, left, tbl_top, int(width), int(height))
     table = gf.table
     table.first_row = False
@@ -664,36 +665,40 @@ def _slide_roi(prs, v, company_name, page):
             run = p.add_run()
             T._apply_run(run, ln, size=size, bold=bold, italic=False, color=color, font=T.FONT)
 
-    mcell(0, 0, ["EPC ဖြင့်သာ သုံးစွဲပါက"], size=16, bold=True, color=T.WHITE, bg=T.ACCENT)
-    mcell(0, 1, ["Solar ဖြင့် သုံးစွဲပါက"], size=16, bold=True, color=T.WHITE, bg=T.ACCENT)
+    mcell(0, 0, ["ယခု ပေးနေရသော ဓာတ်အားခ (Solar မရှိ)"], size=15, bold=True, color=T.WHITE, bg=T.ACCENT)
+    mcell(0, 1, ["Solar ဖြင့် ကျန်ရှိသေးသော ဓာတ်အားခ"], size=15, bold=True, color=T.WHITE, bg=T.ACCENT)
 
     mcell(1, 0, [
         "တစ်နှစ်စာ ကုန်ကျငွေ",
         f"{i(n1)} ယူနစ် × ၃၀ ရက် × ၁၂ လ × {i(cost)} ကျပ်",
-        f"= {i(annual_epc)} ကျပ်",
+        f"= {i(annual_bill_now)} ကျပ်",
     ], size=13, bold=False, color=T.WHITE, bg=T.PANEL)
     mcell(1, 1, [
         "တစ်နှစ်စာ ကုန်ကျငွေ",
-        f"{i(n3)} ယူနစ် × ၃၀ ရက် × ၁၂ လ × {i(cost)} ကျပ်",
-        f"= {i(annual_solar)} ကျပ်",
+        f"{i(n2)} ယူနစ် × ၃၀ ရက် × ၁၂ လ × {i(cost)} ကျပ်",
+        f"= {i(annual_bill_with_solar)} ကျပ်",
     ], size=13, bold=False, color=T.WHITE, bg=T.PANEL)
 
     mcell(2, 0, [
-        f"{years} နှစ်စာ ကုန်ကျငွေ",
-        f"{i(annual_epc)} × {years}",
-        f"= {i(total_epc)} ကျပ်",
+        "နှစ်စဉ် ချွေတာငွေ (Annual Savings)",
+        f"{i(annual_bill_now)} − {i(annual_bill_with_solar)}",
+        f"= {i(annual_savings)} ကျပ်",
     ], size=13, bold=True, color=T.GOLD, bg=T.PANEL)
     mcell(2, 1, [
-        f"{years} နှစ်စာ ကုန်ကျငွေ",
-        f"{i(annual_solar)} × {years}",
-        f"= {i(total_solar)} ကျပ်",
+        "Solar စနစ် ရင်းနှီးငွေ (System Investment)",
+        "System Options မှ CAPEX",
+        f"= {i(system_cost)} ကျပ်",
     ], size=13, bold=True, color=T.GOLD, bg=T.PANEL)
 
-    # savings conclusion
-    T.add_text(slide,
-               f"{years} နှစ်အတွင်း ချွေတာနိုင်မှု = {i(total_epc)} − {i(total_solar)} = {i(savings)} ကျပ်",
-               Inches(0.7), prs.slide_height - Inches(1.05), width, Inches(0.5),
-               size=15, bold=True, color=T.WHITE, align=PP_ALIGN.CENTER)
+    # payback-period conclusion
+    if payback_years is not None:
+        conclusion = (f"ရင်းနှီးငွေ ပြန်ရရှိချိန် (Payback Period) = "
+                      f"{i(system_cost)} ÷ {i(annual_savings)} = {payback_years:.1f} နှစ်")
+    else:
+        conclusion = "ရင်းနှီးငွေ ပြန်ရရှိချိန် တွက်ရန် ချွေတာငွေ လိုအပ်ပါသည်"
+    T.add_text(slide, conclusion,
+               Inches(0.7), prs.slide_height - Inches(1.3), width, Inches(0.6),
+               size=17, bold=True, color=T.WHITE, align=PP_ALIGN.CENTER)
 
 
 def _slide_payback(prs, data, options, company_name, page):
@@ -765,7 +770,7 @@ def _slide_payback(prs, data, options, company_name, page):
         cell(7, ci, f"{i0(py)} Years", size=12, bold=True, color=T.GOLD, bg=T.PANEL)
 
 
-def _slide_usage_chart(prs, data, chart_opts, company_name, page):
+def _slide_usage_chart(prs, v, chart_opts, company_name, page):
     from .chart_usage import render_usage_chart
 
     def n(x):
@@ -774,25 +779,25 @@ def _slide_usage_chart(prs, data, chart_opts, company_name, page):
         except (TypeError, ValueError):
             return 0.0
 
-    # baseline "Daily Usage Unit" group: Load = Grid = daily usage, Solar = 0
-    baseline = n(data.get("chart_daily_usage"))
-    if not baseline and chart_opts:
-        first = chart_opts[0]
-        baseline = n(first.get("grid_units")) + n(first.get("solar_units"))
+    # Load = the client's actual 24h consumption (constant across every
+    # option -- it's their real usage, not something an option changes).
+    # Grid/Solar are per-option: how many of those units still come from the
+    # grid vs. how many the option's solar system can generate.
+    load = n(v.get("roi_total_epc_units"))
+    if not load:
+        load = n(v.get("total_epc_units")) / 30  # bill is monthly; fall back to a daily estimate
 
-    groups = [{"label": "DAILY USAGE UNIT", "load": baseline, "grid": baseline, "solar": 0}]
+    groups = []
     for o in chart_opts:
-        grid = n(o.get("grid_units"))
-        solar = n(o.get("solar_units"))
         groups.append({
             "label": (o.get("title") or "Option").upper(),
-            "load": grid + solar,
-            "grid": grid,
-            "solar": solar,
+            "load": load,
+            "grid": n(o.get("grid_units")),
+            "solar": n(o.get("solar_units")),
         })
 
     slide = T.add_slide(prs, page=page, company_name=company_name)
-    top = T.add_title(slide, prs, "Daily Power Usage Comparison (Battery + EPC)")
+    top = T.add_title(slide, prs, "Daily Power Usage Comparison (Load / Grid / Solar)")
     png = render_usage_chart(groups)
     T.add_image_contain(slide, png, Inches(0.5), top, prs.slide_width - Inches(1.0),
                         prs.slide_height - top - Inches(0.7))

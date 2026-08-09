@@ -242,7 +242,9 @@ def preview_flowchart(project_id: str):
 
 
 @router.post("/{project_id}/export")
-def export(project_id: str):
+def export(project_id: str, format: str = "pptx"):
+    if format not in ("pptx", "pdf"):
+        raise HTTPException(400, "format must be 'pptx' or 'pdf'")
     project = fdb.get("projects", project_id)
     if not project:
         raise HTTPException(404, "Project not found")
@@ -255,10 +257,11 @@ def export(project_id: str):
     if warranty_template_id:
         templates = bp.read("warranty_templates") or []
         warranty_template = next((t for t in templates if t.get("id") == warranty_template_id), None)
+    theme = (project.get("data") or {}).get("pptx_theme")
     pptx_bytes = export_project_v2(
         _ProjectView(project), storage, company_info=company_info,
         selected_products=selected_products, introduction_message=introduction_message,
-        thank_you_message=thank_you_message, warranty_template=warranty_template,
+        thank_you_message=thank_you_message, warranty_template=warranty_template, theme=theme,
     )
     # track export stats (month bucket) for the dashboard
     stats = dict(bp.read("export_stats") or {})
@@ -271,9 +274,22 @@ def export(project_id: str):
         "export_count": (project.get("export_count") or 0) + 1,
         "last_exported_at": datetime.datetime.utcnow(),
     })
-    filename = f"{(project.get('data') or {}).get('site_name') or project.get('name')}_proposal.pptx".replace(" ", "_")
+    base_name = f"{(project.get('data') or {}).get('site_name') or project.get('name')}_proposal".replace(" ", "_")
+
+    if format == "pdf":
+        from ..services.pptx_to_pdf import convert_pptx_to_pdf, PdfConversionError
+        try:
+            pdf_bytes = convert_pptx_to_pdf(pptx_bytes)
+        except PdfConversionError as e:
+            raise HTTPException(502, str(e))
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{base_name}.pdf"'},
+        )
+
     return Response(
         content=pptx_bytes,
         media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": f'attachment; filename="{base_name}.pptx"'},
     )

@@ -24,7 +24,7 @@ export const SECTIONS = [
     fields: [
       { name: "survey_lat", label: "Map Location — Latitude", help: "ဥပမာ — 21.9022", type: "number" },
       { name: "survey_lng", label: "Map Location — Longitude", help: "ဥပမာ — 95.9923", type: "number" },
-      { name: "project_solution", label: "Project Solution", help: "ဥပမာ — ESS + Solar Solution For 48kW Load", type: "text" },
+      { name: "project_solution", label: "Project Solution", help: "Managed in Admin → Settings.", type: "solution-select" },
       { name: "install_area_sqft", label: "Solar Panel Installation Area (sq ft)", help: "ဥပမာ — 300", type: "number" },
       { name: "tilt_angle", label: "Tilt Angle (degrees)", help: "ဥပမာ — 22", type: "number" },
     ],
@@ -102,13 +102,13 @@ export const SECTIONS = [
     key: "roi",
     title: "ROI (Slide 15)",
     roiCalc: true,
-    note: "Return-on-investment: compares EPC-only vs Solar cost over the chosen years. Slide 15 shows the step-by-step calculation in Burmese.",
+    note: "Return on investment: what the client pays for grid electricity now, what the solar system costs, how much it saves per year, and how many years until that saving pays back the system cost.",
     fields: [
-      { name: "roi_total_epc_units", label: "Total EPC Usage (Units/day)", help: "ဖောက်သည်၏ စုစုပေါင်း နေ့စဉ် သုံးစွဲမှု။ ဥပမာ — 684", type: "number" },
-      { name: "roi_epc_with_solar_units", label: "EPC Usage when Solar in use (Units/day)", help: "Solar သုံးချိန် EPC မှ ဆက်သုံးသော ယူနစ်။ ဥပမာ — 156", type: "number" },
-      { name: "roi_solar_units", label: "Total Solar Usage (Units/day)", help: "Solar မှ ထုတ်ပေးသော ယူနစ်။ ဥပမာ — 528", type: "number" },
+      { name: "roi_total_epc_units", label: "Current Usage without Solar (Units/day)", help: "ဖောက်သည်၏ စုစုပေါင်း နေ့စဉ် သုံးစွဲမှု။ ဥပမာ — 684", type: "number" },
+      { name: "roi_epc_with_solar_units", label: "Remaining Grid Usage with Solar (Units/day)", help: "Solar သုံးချိန် EPC မှ ဆက်သုံးသော ယူနစ်။ ဥပမာ — 156", type: "number" },
+      { name: "roi_solar_units", label: "Solar Generation (Units/day)", help: "Solar မှ ထုတ်ပေးသော ယူနစ်။ ဥပမာ — 528", type: "number" },
       { name: "roi_avg_unit_cost", label: "Average Unit Cost (MMK)", help: "တစ်ယူနစ် ပျမ်းမျှ ဈေးနှုန်း။ ဥပမာ — 500", type: "number" },
-      { name: "roi_years", label: "Number of Years (1-10)", help: "တွက်ချက်မည့် နှစ်အရေအတွက်။ ဥပမာ — 7", type: "number" },
+      { name: "roi_system_cost", label: "Total System Investment / CAPEX (MMK)", help: "Auto-copied from System Options — edit here if it differs.", type: "number" },
     ],
   },
 ];
@@ -235,26 +235,32 @@ export function paybackRows(data) {
   };
 }
 
+// ROI framing: the client currently pays `annualBillNow` (N) per year for
+// grid electricity. The solar+battery system costs `systemCost` (D) as a
+// one-time investment. Once installed, the client only pays
+// `annualBillWithSolar` per year for the remaining grid usage, saving
+// `annualSavings` (M) every year -- so the system pays for itself in
+// `paybackYears` (Y = D / M).
 export function roiCompute(data) {
   const num = (v) => Number(v) || 0;
   const n1 = num(data.roi_total_epc_units);
   const n2 = num(data.roi_epc_with_solar_units);
   const n3 = num(data.roi_solar_units);
   const cost = num(data.roi_avg_unit_cost);
-  const years = num(data.roi_years) || 5;
-  const annualEpc = n1 * 30 * 12 * cost;
-  const annualSolar = n3 * 30 * 12 * cost;
-  const totalEpc = annualEpc * years;
-  const totalSolar = annualSolar * years;
+  const systemCost = num(data.roi_system_cost);
+
+  const annualBillNow = n1 * 30 * 12 * cost;
+  const annualBillWithSolar = n2 * 30 * 12 * cost;
+  const annualSavings = annualBillNow - annualBillWithSolar;
+  const paybackYears = annualSavings > 0 ? systemCost / annualSavings : null;
+
   const gcd = (a, b) => (b ? gcd(b, a % b) : a);
   const g = n2 && n3 ? gcd(Math.round(n2), Math.round(n3)) || 1 : 1;
   return {
-    years,
     ratio: n2 && n3 ? `${Math.round(n2 / g)} : ${Math.round(n3 / g)}` : "—",
     epcPct: n1 ? Math.round((n2 / n1) * 100) : 0,
     solarPct: n1 ? Math.round((n3 / n1) * 100) : 0,
-    annualEpc, annualSolar, totalEpc, totalSolar,
-    savings: totalEpc - totalSolar,
+    annualBillNow, annualBillWithSolar, annualSavings, systemCost, paybackYears,
   };
 }
 
