@@ -4,6 +4,16 @@ Running log of notable changes for AI tooling/session continuity. Newest entries
 
 ---
 
+## 2026-08-08 (3) — Fix Power Analyzer chart peak mismatch
+
+**Backend only** (`power_analyzer.py`, `chart_power_hourly.py`):
+- User reported: the stats panel's peak kW was correct, but the hourly chart's tallest bar showed a different (lower) peak. Root cause: the chart only plotted each hour's *average* kW, and an hour's average is always ≤ its max — a brief spike gets smoothed away once averaged across its hour bucket.
+- Fixed: each hourly bucket now also tracks `peak_kw` (the true max sample within that hour), and the chart plots it as a gold line/marker series on top of the existing average bars. The chart's highest point now always equals the same `peak_kw` shown in the stats panel, since that stat is just the max across all hourly peaks.
+- Verified with a synthetic CSV containing one sharp spike: confirmed `max(hourly peaks) == peak_kw` exactly.
+- Deployed: `gcloud run deploy` (backend only, no frontend change).
+
+---
+
 ## 2026-08-08 (2) — 15-item batch: bug fixes + proposal form/admin features
 
 **Bug fixes** (highest priority, were blocking real usage):
