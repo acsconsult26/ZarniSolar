@@ -181,7 +181,11 @@ def analyze_power_log(file_bytes: bytes, filename: str = "") -> dict:
         bucket = t.replace(minute=0, second=0, microsecond=0)
         buckets.setdefault(bucket, []).append(kw)
     hourly = [
-        {"hour": bucket.strftime("%d %b %H:%M"), "avg_kw": round(sum(vals) / len(vals), 2)}
+        {
+            "hour": bucket.strftime("%d %b %H:%M"),
+            "avg_kw": round(sum(vals) / len(vals), 2),
+            "peak_kw": round(max(vals), 2),
+        }
         for bucket, vals in sorted(buckets.items())
     ]
 
