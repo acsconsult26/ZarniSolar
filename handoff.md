@@ -4,6 +4,17 @@ Running log of notable changes for AI tooling/session continuity. Newest entries
 
 ---
 
+## 2026-08-09 — Fix broken mobile layout (Admin panel + proposal form hardening)
+
+**Frontend only** (`App.css`):
+- User screenshot showed the Admin panel sidebar on mobile rendering as a full-height vertical stack of nav buttons pushing all page content off-screen. The `<720px` media query existed but was broken: it set `flex-direction: row` on the sidebar container itself while the nav *list* inside it kept wrapping full-width buttons vertically.
+- Rewrote the mobile admin layout: sidebar becomes a compact sticky top bar (brand row, then a horizontally-scrollable strip of icon-over-label nav pills) — the same pattern the proposal form's section rail already used successfully. `admin-topbar` drops its own sticky position so it doesn't fight the sidebar for `top:0`.
+- Also swept the proposal form's fixed-`minmax` grids (System Options, theme picker, power-analyzer stats, export actions) for a `<640px` pass, since desktop-sized `minmax()` floors could run wider than a phone's content width after padding and trigger whole-page horizontal scroll.
+- Verified on a 375px mobile viewport via the dev-stub technique: admin nav scrolls to reach all 7 tabs with zero page overflow (confirmed via `document.body.scrollWidth`), and System Options cards fit exactly at 340px.
+- Deployed: `firebase deploy --only hosting` only.
+
+---
+
 ## 2026-08-08 (3) — Fix Power Analyzer chart peak mismatch
 
 **Backend only** (`power_analyzer.py`, `chart_power_hourly.py`):
