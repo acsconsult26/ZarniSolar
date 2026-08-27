@@ -297,15 +297,31 @@ footer button:disabled { opacity: 0.45; cursor: default; }
 }
 
 @media (max-width: 720px) {
+  /* Sidebar becomes a compact sticky top bar: brand row, then the nav
+     items as a horizontally scrollable strip of icon-over-label pills
+     (not a full vertical stack, and not wrapped -- both produced a broken,
+     overly tall layout on phones). admin-topbar drops its own sticky
+     positioning so the two don't fight for the same top:0 slot. */
   .admin-shell { flex-direction: column; }
-  .admin-sidebar, .admin-sidebar.collapsed { width: 100%; height: auto; position: static; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 1rem; }
+  .admin-sidebar, .admin-sidebar.collapsed {
+    width: 100%; height: auto; position: sticky; top: 0; z-index: 20;
+    flex-direction: column; padding: 0.65rem 0.7rem; gap: 0.5rem; transition: none;
+  }
   .admin-sidebar .sidebar-collapse-btn { display: none; }
+  .sidebar-brand { padding: 0 0 0.5rem; margin-bottom: 0; }
   .admin-sidebar.collapsed .sidebar-brand span { display: inline; }
-  .sidebar-nav { flex-direction: row; flex-wrap: wrap; }
-  .sidebar-nav button span, .admin-sidebar.collapsed .sidebar-nav button span { display: inline; }
+  .sidebar-nav {
+    flex-direction: row; flex-wrap: nowrap; flex: none; overflow-x: auto; gap: 0.35rem;
+    -webkit-overflow-scrolling: touch; padding-bottom: 0.15rem;
+  }
+  .sidebar-nav button, .admin-sidebar.collapsed .sidebar-nav button {
+    flex-direction: column; gap: 0.25rem; padding: 0.5rem 0.65rem; flex-shrink: 0; justify-content: center;
+  }
+  .sidebar-nav button span, .admin-sidebar.collapsed .sidebar-nav button span { display: block; font-size: 0.66rem; white-space: nowrap; }
   .sidebar-foot { flex-direction: row; border: none; padding: 0; }
+  .sidebar-link, .sidebar-logout { flex-shrink: 0; padding: 0.5rem 0.7rem; }
   .sidebar-link span, .sidebar-logout span { display: inline; }
-  .admin-topbar { padding: 0.9rem 1.1rem; flex-wrap: wrap; gap: 0.6rem; }
+  .admin-topbar { position: static; padding: 0.9rem 1.1rem; flex-wrap: wrap; gap: 0.6rem; }
   .admin-content { padding: 1.1rem; }
   .admin-user-chip { display: none; }
 }
@@ -316,6 +332,25 @@ footer button:disabled { opacity: 0.45; cursor: default; }
   .wizard-step-title { text-align: left; }
   .catalog-head { flex-direction: column; align-items: stretch; }
   .modal-overlay { padding: 1rem 0.5rem; }
+}
+
+/* Proposal form on narrow phones: fixed-minmax grids (sized for desktop
+   option cards / theme swatches) can run wider than the available content
+   width once the fp-app side padding is subtracted, causing the whole page
+   to scroll horizontally. Drop every such grid to a single column instead
+   of letting it fight the viewport. */
+@media (max-width: 640px) {
+  .fp-app { padding: 0 0.75rem 3rem; }
+  .fp-meta-row { padding: 0.7rem 0 0; }
+  .sysopts-grid { grid-template-columns: 1fr; }
+  .theme-picker-grid { grid-template-columns: 1fr; }
+  .pa-stats-grid { grid-template-columns: 1fr 1fr; }
+  .export-actions { flex-direction: column; align-items: stretch; }
+  .export-split { width: 100%; }
+  .export-split-main { flex: 1; }
+  .export-done { flex-direction: column; align-items: stretch; text-align: center; }
+  .field-grid { grid-template-columns: 1fr; }
+  .image-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
 }
 
 .admin-grid { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 1.25rem; align-items: start; }
